@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Turn MLIT's Shinjuku indoor map (Shapefile zip) into the game's world JSON.
 
-Usage: python3 tools/build_mlit.py data/raw/mlit-shinjuku-indoor-shapefile.zip public/data/shinjuku.json
+Usage: python3 tools/build_mlit.py <zip> <out.json> <station>     (station: shinjuku | tokyo)
+  e.g. python3 tools/build_mlit.py data/raw/mlit-tokyo-indoor-shapefile.zip public/data/tokyo.json tokyo
 
 Needs: pip install pyshp shapely
 
@@ -9,7 +10,7 @@ Source: 「新宿駅周辺屋内地図データ」（国土交通省）
 (https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2) を加工して作成.
 Codes follow the dataset's spec, 階層別屋内地理空間情報データ仕様書（案）.
 """
-import io, json, math, os, sys, tempfile, zipfile, collections
+import io, json, math, os, re, sys, tempfile, zipfile, collections
 
 import shapefile  # pyshp
 import shapely
@@ -17,7 +18,12 @@ from shapely.geometry import shape, Polygon, MultiPolygon, LineString, Point
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
-LON0, LAT0 = 139.7000, 35.6910          # origin: Shinjuku Station
+# Each station gets its own local frame, origin at the station. Shinjuku's must not move: levels use its coordinates.
+STATIONS = {
+    "shinjuku": {"origin": (139.7000, 35.6910), "dataset": "mlit-indoor-shinjuku-r2", "name": "新宿駅周辺屋内地図データ"},
+    "tokyo": {"origin": (139.767125, 35.681236), "dataset": "mlit-indoor-tokyo-r2", "name": "東京駅周辺屋内地図データ"},
+}
+LON0, LAT0 = STATIONS["shinjuku"]["origin"]
 KX = 111320.0 * math.cos(math.radians(LAT0))
 KY = 111000.0
 
@@ -37,6 +43,25 @@ FACILITY_EN = {
     "7.京王新宿駅_京王モールアネックス": "Keio / Keio Mall Annex", "8.京王モール": "Keio Mall", "9.都営新宿駅": "Toei Shinjuku",
     "10.都営新宿西口駅": "Toei Shinjuku-nishiguchi", "11.サブナード": "Subnade", "12.西武新宿駅": "Seibu Shinjuku",
     "13.西口周辺": "West Exit", "14.バスタ新宿": "Busta Shinjuku", "15.NEWoMan": "NEWoMan", "16.other": "other",
+    # Tokyo Station area
+    "1.JR東京駅": "JR Tokyo", "2.地下鉄_公共通路": "Subway passages", "3.丸ビル": "Marunouchi Building",
+    "4.新丸ビル": "Shin-Marunouchi Building", "5.TOKIA": "TOKIA", "6.丸の内ブリックスクエア": "Marunouchi Brick Square",
+    "8.三菱UFJ信託銀行本店ビル": "Mitsubishi UFJ Trust Bank", "9.丸の内オアゾ": "Marunouchi OAZO",
+    "10.三菱商事ビル": "Mitsubishi Corporation Building", "11.KITTE": "KITTE", "12.東京交通会館": "Tokyo Kotsu Kaikan",
+    "13.有楽町イトシア": "Yurakucho Itocia", "14.有楽町マリオン": "Yurakucho Marion", "15.オーテモリ": "Otemori",
+    "16.東京国際フォーラム": "Tokyo International Forum", "17.鉄鋼ビルディング": "Tekko Building",
+}
+
+
+# Tokyo's subway folder holds one file set per station. Names come from the prefixes, and each was checked
+# against the real station's coordinates (ja.wikipedia, 2026-11-10): every set lies within ~310 m of its station.
+SUBSET_EN = {
+    "ChiyodaHibiya": "Chiyoda line · Hibiya", "ChiyodaNiju": "Chiyoda line · Nijubashimae",
+    "ChiyodaOtemati": "Chiyoda line · Otemachi", "GinzaGinza": "Ginza line · Ginza", "Hanzo": "Hanzomon line · Otemachi",
+    "HibiyaGinza": "Hibiya line · Ginza", "HibiyaHibiya": "Hibiya line · Hibiya", "HibiyaHigagin": "Hibiya line · Higashi-Ginza",
+    "MaruGinza": "Marunouchi line · Ginza", "MaruOtemati": "Marunouchi line · Otemachi", "MaruTokyo": "Marunouchi line · Tokyo",
+    "MitaHibiya": "Mita line · Hibiya", "MitaOtemati": "Mita line · Otemachi", "Tozai": "Tozai line · Otemachi",
+    "YurakuTika": "Yurakucho underground", "Yurakucho": "Yurakucho",
 }
 
 
@@ -97,23 +122,19 @@ def ring_out(ring):
     return [[r2(x), r2(z)] for x, z in pts]
 
 
-def main(zpath, out):
+def main(zpath, out, station="shinjuku"):
+    global LON0, LAT0, KX
+    cfg = STATIONS[station]
+    LON0, LAT0 = cfg["origin"]
+    KX = 111320.0 * math.cos(math.radians(LAT0))
     tmp = tempfile.mkdtemp()
     root = extract(zpath, tmp)
     per = collections.defaultdict(lambda: {"floor": [], "floor_out": [], "solid": [], "solid_kind": [],
                                            "solid_cat": [], "walkway": [], "cols": []})
     exits, gates = [], []
-    for fac in sorted(os.listdir(root)):
-        fdir = os.path.join(root, fac)
-        if not os.path.isdir(fdir) or fac == "nw":
-            continue
-        for lvl in sorted(os.listdir(fdir)):
-            d = os.path.join(fdir, lvl)
-            if not os.path.isdir(d):
-                continue
-            files = {f.rsplit("_", 1)[-1][:-4]: os.path.join(d, f) for f in os.listdir(d) if f.endswith(".shp")}
+    def read_set(files, fac, prefix=''):
             if "Floor" not in files:
-                continue
+                return
             fr = reader(files["Floor"])
             o = fr.records()[0].ordinal
             P = per[o]
@@ -141,8 +162,8 @@ def main(zpath, out):
                     if rec.category == "F108" and s.points:
                         x, z = xy(*s.points[0])
                         name = (rec.name or "").strip()
-                        exits.append({"n": name.replace("（閉鎖中）", ""), "closed": "閉鎖" in name,
-                                      "o": o, "x": r2(x), "z": r2(z), "fac": FACILITY_EN.get(fac, fac)})
+                        exits.append({"n": re.sub(r"\s*[（(]閉鎖中[）)]", "", name), "closed": "閉鎖" in name,
+                                      "o": o, "x": r2(x), "z": r2(z), "fac": SUBSET_EN.get(prefix) or FACILITY_EN.get(fac, fac.split('.', 1)[-1])})
             if "Opening" in files:
                 orr = reader(files["Opening"])
                 for s, rec in zip(orr.shapes(), orr.records()):
@@ -152,9 +173,30 @@ def main(zpath, out):
                         gates.append({"n": "" if n == "不明" else n, "o": o,
                                       "a": [r2(x1), r2(z1)], "b": [r2(x2), r2(z2)]})
 
+    for fac in sorted(os.listdir(root)):
+        fdir = os.path.join(root, fac)
+        if not os.path.isdir(fdir) or fac == "nw":
+            continue
+        for lvl in sorted(os.listdir(fdir)):
+            d = os.path.join(fdir, lvl)
+            if not os.path.isdir(d):
+                continue
+            # A floor directory can hold several file sets, one per sub-facility (Tokyo's subway folder has a set
+            # per station: ChiyodaHibiya_B1_*, GinzaGinza_B1_*, ...). Group by the prefix before <level>_<Kind>.
+            sets = collections.defaultdict(dict)
+            for f in os.listdir(d):
+                if f.endswith(".shp") and f.count("_") >= 2:
+                    prefix, _lvl, kind = f[:-4].rsplit("_", 2)
+                    sets[prefix][kind] = os.path.join(d, f)
+            for prefix, files in sets.items():
+                read_set(files, fac, prefix)
+
+
     # walking network
     nwd = os.path.join(root, "nw")
-    N, Lk = reader(os.path.join(nwd, "Shinjuku_node")), reader(os.path.join(nwd, "Shinjuku_link"))
+    shp = {f.lower(): os.path.join(nwd, f[:-4]) for f in os.listdir(nwd) if f.lower().endswith(".shp")}
+    N = reader(next(v for k, v in shp.items() if "node" in k))
+    Lk = reader(next(v for k, v in shp.items() if "link" in k))
     ids, nodes = {}, []
     for rec in N.records():
         x, z = xy(rec.lon, rec.lat)
@@ -182,7 +224,7 @@ def main(zpath, out):
         # through shops, toilets and the like ("other room", B019, is often a passage the network uses)
         hard = unary_union([g for g, c in zip(P["solid"], P["solid_cat"]) if c != "B019"]) if P["solid"] else Polygon()
         lines = [LineString(l["p"]) for l in links
-                 if l["t"] == 1 and nodes[l["a"]][2] == o and nodes[l["b"]][2] == o and len(l["p"]) >= 2]
+                 if l["t"] in (1, 7) and nodes[l["a"]][2] == o and nodes[l["b"]][2] == o and len(l["p"]) >= 2]
         carve = unary_union([ln.buffer(0.9) for ln in lines]).difference(hard).difference(cols) if lines else Polygon()
         walk = unary_union([base.difference(unary_union([solid, cols])), carve]).buffer(0)
         walk = walk.simplify(0.05)
@@ -239,11 +281,11 @@ def main(zpath, out):
         if not isint(so):
             continue
         for nb, li, fwd in adj[start]:
-            if links[li]["t"] not in (4, 5, 6):
+            if links[li]["t"] not in (4, 5, 6, 7):
                 continue
             path_nodes, path_links, cur, prev, ok = [start], [li], nb, start, True
             while not isint(nodes[cur][2]):
-                nxt = [(n2, l2) for n2, l2, _ in adj[cur] if n2 != prev and links[l2]["t"] in (1, 4, 5, 6)]
+                nxt = [(n2, l2) for n2, l2, _ in adj[cur] if n2 != prev and links[l2]["t"] in (1, 4, 5, 6, 7)]
                 if len(nxt) != 1:
                     ok = False
                     break
@@ -267,12 +309,13 @@ def main(zpath, out):
                     f = j / max(len(lp) - 1, 1)
                     pts.append([px, pz, round(o1 + (o2 - o1) * f, 3)])
             types = {links[l2]["t"] for l2 in path_links} - {1}
-            t = 4 if 4 in types else 5 if 5 in types else 6
+            t = 4 if 4 in types else 5 if 5 in types else 7 if 7 in types and 6 not in types else 6
             conns.append({"t": t, "a": start, "b": cur, "p": pts})
 
     out_obj = {
         "meta": {
-            "source": "「新宿駅周辺屋内地図データ」（国土交通省）(https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2) を加工して作成",
+            "station": station,
+            "source": f"「{cfg['name']}」（国土交通省）（https://www.geospatial.jp/ckan/dataset/{cfg['dataset']}）を加工して作成",
             "credit": "出典：国土交通省 高精度測位社会プロジェクト",
             "license": "政府標準利用規約（第2.0版）, compatible with CC BY 4.0",
             "origin": [LON0, LAT0], "units": "metres, x east, z south",
@@ -288,4 +331,4 @@ def main(zpath, out):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "shinjuku")

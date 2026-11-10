@@ -120,7 +120,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
   East: OSM's Metro Promenade to Sanchome. Nishi-Shinjuku and E9 from OSM. Stitch onto the MLIT core, then
   verify kira's "A17 dead-ends" claim against the data. Use PLATEAU's elevations for true floor depths.
 - **2.** Lost property and runs: finds, use or return, the lost-and-found counter, the daily seed.
-- **3.** Tokyo Station area (MLIT data #2).
+- **3.** Tokyo Station area (MLIT data #2). **Done 2026-11-10 as level 1:** Higashi-Ginza → Otemachi, 2.7 km.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 
