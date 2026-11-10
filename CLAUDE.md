@@ -33,7 +33,8 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   Tokyo's second line is the same with 「東京駅周辺屋内地図データ」 and `mlit-indoor-tokyo-r2`.
   Never present the result as made by the government. Logos are outside the licence.
 - **OpenStreetMap** (`data/osm/`, ODbL 1.0, "© OpenStreetMap contributors" in the game's credits): used for
-  Astra's route. `tools/build_astra.py` merges it with MLIT + ほこナビ into `public/data/shinjuku-astra.json`, which is
+  Astra's route, and for platforms and tracks (`tools/filter_rail.py` → `data/osm/rail-*.osm.gz` → `tools/build_rail.py`
+  → `public/data/{shinjuku,tokyo}-rail.json`, ODbL files of their own; MLIT doesn't map platforms). `tools/build_astra.py` merges it with MLIT + ほこナビ into `public/data/shinjuku-astra.json`, which is
   therefore an ODbL derivative database (its `meta.license` says so). Keep OSM out of the MLIT-only files
   (`shinjuku.json`, `tokyo.json`). From cloud sessions, Overpass is blocked by the network policy, but the main API
   works: `https://api.openstreetmap.org/api/0.6/map?bbox=...` for station-sized boxes. Don't route around the block.
@@ -128,6 +129,15 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   is a game ecology by depth, not survey data. **Every field-note fact has a source URL in `SOURCES`**
   (`tests/critters.test.js` enforces it): don't add a fact you haven't checked. The `Store` keeps field notes
   (`notes`).
+- `src/trains.js` + `src/crowd.js` + `src/blocks.js`: trains, tanuki and the crowd.
+  - **Trains.** They run on OSM tracks snapped to MLIT's real platform edges (`build_rail.py` drops any it can't place
+    off the walkable floor). `timetable()` is pure and seeded by tonight's chart. About one arrival in six is tanuki,
+    stacked into a train shape (偽汽車, the Meiji phantom-train tales), with a sourced field note (`TANUKI.sources`).
+  - **The world.** `World` turns the walls between a platform and its track into platform doors (frames, so you can see
+    through) and draws the track bed and tunnel.
+  - **The crowd.** Goofy commuters walk the walking network near the kitten, wait on platforms, and board stopped
+    trains. They thin out in patches and fade between the camera and the kitten.
+  - **Cost.** Use `blocks.js` (`B`, `S`, `merged`) for anything made of many little boxes: one mesh, not hundreds.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered

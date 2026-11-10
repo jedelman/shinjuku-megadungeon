@@ -83,8 +83,9 @@ function triangles(poly, maxEdge = 3) {
 }
 
 export class World {
-  constructor(data) {
+  constructor(data, rail = null) {
     this.data = data;
+    this.rail = rail;   // platforms and tracks from OSM (src/trains.js runs the trains)
     this.groups = new Map();
     this.mats = {
       floor: makeMaterial(floorTex(), { side: THREE.DoubleSide }),
@@ -129,8 +130,38 @@ export class World {
     }
 
     const wl = new ChunkBuilder(), gl = new ChunkBuilder();
+    // platform edges that face a track become low glass platform doors, with the drop to the track bed below them
+    const tracks = (this.rail?.tracks || []).filter((t) => floorKey(t.o) === key);
+    const edgeOf = (x1, z1, x2, z2) => {
+      const len = Math.hypot(x2 - x1, z2 - z1);
+      if (len < 0.05) return null;
+      const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+      for (const t of tracks) {
+        if (Math.abs(((x2 - x1) * t.u[0] + (z2 - z1) * t.u[1]) / len) < 0.9) continue;
+        const along = (mx - t.p[0]) * t.u[0] + (mz - t.p[1]) * t.u[1];
+        const d = (mx - t.p[0]) * t.n[0] + (mz - t.p[1]) * t.n[1];
+        if (Math.abs(along - t.stop) <= t.L / 2 + 2 && Math.abs(d) >= 0.9 && Math.abs(d) <= 2.6) return { t, side: Math.sign(d) };
+      }
+      return null;
+    };
+    const sides = new Map();   // which sides of each track have a platform
+    const concrete = rgb(0x8a8578), doorTint = rgb(0xc8ccd0);
     for (const [x1, z1, x2, z2, kind] of f.walls) {
       if (kind === 'col') continue;
+      const e = edgeOf(x1, z1, x2, z2);   // anything in the gap between a platform and its track is the platform's edge
+      if (e) {
+        sides.set(e.t, (sides.get(e.t) || new Set()).add(e.side));
+        const len = Math.hypot(x2 - x1, z2 - z1);
+        // platform doors, drawn as their frame: the glass is clear, so a kitten can watch the trains through it
+        const dx = (x2 - x1) / len, dz = (z2 - z1) / len;
+        for (const [h0, h1] of [[0, 0.18], [1.18, 1.32]]) wl.quad([x1, y + h0, z1], [x2, y + h0, z2], [x2, y + h1, z2], [x1, y + h1, z1], [0, 0], [len, 0], [len, 0.2], [0, 0.2], doorTint);
+        for (let a = 0; a <= len; a += 2.4) {
+          const px = x1 + dx * a, pz = z1 + dz * a;
+          wl.quad([px - dx * 0.05, y, pz - dz * 0.05], [px + dx * 0.05, y, pz + dz * 0.05], [px + dx * 0.05, y + 1.32, pz + dz * 0.05], [px - dx * 0.05, y + 1.32, pz - dz * 0.05], [0, 0], [0.1, 0], [0.1, 1], [0, 1], doorTint);
+        }
+        wl.quad([x1, y - 1.05, z1], [x2, y - 1.05, z2], [x2, y, z2], [x1, y, z1], [0, 0], [len / 1.2, 0], [len / 1.2, 0.9], [0, 0.9], concrete.map((v) => v * 0.7), concrete.map((v) => v * 0.7), concrete, concrete);
+        continue;
+      }
       const len = Math.hypot(x2 - x1, z2 - z1);
       const n = Math.max(1, Math.ceil(len / 2));
       const shop = kind === 'shop';
@@ -149,6 +180,24 @@ export class World {
           b.quad([ax, y + h0, az], [bx, y + h0, bz], [bx, y + h1, bz], [ax, y + h1, az],
             [(t0 * len) / s, h0 / s], [(t1 * len) / s, h0 / s], [(t1 * len) / s, h1 / s], [(t0 * len) / s, h1 / s],
             c0, c0, c1, c1);
+        }
+      }
+    }
+
+    // the tracks: a bed below the platforms, two rails, a tunnel wall where no platform faces it, a ceiling over it
+    const ballast = rgb(0x4a4844), steelRail = rgb(0xb8bcc0), tunnel = rgb(0x6a675e);
+    for (const t of tracks) {
+      const a0 = t.stop - t.L / 2 - 25, a1 = t.stop + t.L / 2 + 25;
+      const at = (along, d, h) => [t.p[0] + t.u[0] * along + t.n[0] * d, h, t.p[1] + t.u[1] * along + t.n[1] * d];
+      const yb = y - 1.05;
+      for (let a = a0; a < a1; a += 4) {
+        const b2 = Math.min(a1, a + 4);
+        wl.quad(at(a, -2.4, yb), at(b2, -2.4, yb), at(b2, 2.4, yb), at(a, 2.4, yb), [0, 0], [1, 0], [1, 1], [0, 1], ballast);
+        for (const r of [-0.62, 0.62]) wl.quad(at(a, r - 0.05, yb + 0.12), at(b2, r - 0.05, yb + 0.12), at(b2, r + 0.05, yb + 0.12), at(a, r + 0.05, yb + 0.12), [0, 0], [1, 0], [1, 1], [0, 1], steelRail);
+        ce.quad(at(a, -2.6, y + CH), at(a, 2.6, y + CH), at(b2, 2.6, y + CH), at(b2, -2.6, y + CH), [0, 0], [1, 0], [1, 1], [0, 1], [0.6, 0.6, 0.6]);
+        for (const sd of [-1, 1]) {
+          if (sides.get(t)?.has(sd)) continue;
+          wl.quad(at(a, sd * 2.6, yb), at(b2, sd * 2.6, yb), at(b2, sd * 2.6, y + CH), at(a, sd * 2.6, y + CH), [0, 0], [1, 0], [1, 1], [0, 1], tunnel.map((v) => v * 0.8), tunnel.map((v) => v * 0.8), tunnel, tunnel);
         }
       }
     }
