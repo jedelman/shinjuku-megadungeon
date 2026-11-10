@@ -185,7 +185,7 @@ export class World {
     }
 
     // the tracks: a bed below the platforms, two rails, a tunnel wall where no platform faces it, a ceiling over it
-    const ballast = rgb(0x4a4844), steelRail = rgb(0xb8bcc0), tunnel = rgb(0x6a675e);
+    const ballast = rgb(0x8a857a), steelRail = rgb(0xd8dce0), tunnel = rgb(0xa8a497);   // pale concrete, so what's on the track shows
     for (const t of tracks) {
       const a0 = t.stop - t.L / 2 - 25, a1 = t.stop + t.L / 2 + 25;
       const at = (along, d, h) => [t.p[0] + t.u[0] * along + t.n[0] * d, h, t.p[1] + t.u[1] * along + t.n[1] * d];

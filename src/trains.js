@@ -84,9 +84,9 @@ function trainModel(track) {
 // a tanuki's parts, placed at (ox, oy, oz), facing +z
 function tanukiParts(ox, oy, oz, lead) {
   const P = [
-    S(0.16, 0x8a7660, ox, oy + 0.22, oz, 0.9, 0.8, 1.25),          // body
+    S(0.16, 0xa48660, ox, oy + 0.22, oz, 0.9, 0.8, 1.25),          // body
     S(0.11, 0xb8a68c, ox, oy + 0.17, oz + 0.06),                    // pale belly
-    S(0.105, 0x9a866e, ox, oy + 0.36, oz + 0.18),                   // head
+    S(0.105, 0xb0946e, ox, oy + 0.36, oz + 0.18),                   // head
     B(0.2, 0.05, 0.06, 0x2a2420, ox, oy + 0.36, oz + 0.26),         // the dark mask across the eyes
     S(0.035, 0xd8cbb4, ox, oy + 0.325, oz + 0.27),                  // muzzle
     S(0.03, 0x3a3028, ox - 0.06, oy + 0.44, oz + 0.17), S(0.03, 0x3a3028, ox + 0.06, oy + 0.44, oz + 0.17),   // round dark ears
@@ -128,7 +128,8 @@ function tanukiParade(track) {
     g.add(col);
     walkers.push({ g: col, legs: [], top: true });
   }
-  return { g, members: walkers, n, gap };
+  g.scale.setScalar(1.2);   // a touch bigger than life, so a 240-line screen shows them
+  return { g, members: walkers, n, gap: gap * 1.2 };
 }
 
 export class Trains {
@@ -146,18 +147,19 @@ export class Trains {
 
   dispose() { this.scene.remove(this.root); }
 
-  // tests: make track i bring in a train (or tanuki) and stop now
-  force(i, tanuki = false) { this.forced.set(i, { at: this.now(), tanuki }); }
+  // tests and recordings: make track i bring in a train (or tanuki) now, already stopped or from out in the tunnel
+  force(i, tanuki = false, approach = false) { this.forced.set(i, { at: this.now(), tanuki, approach }); }
   now() { return performance.now() / 1000 - this.t0; }
 
   state(i) {
     const tr = this.rail.tracks[i];
     const f = this.forced.get(i);
     if (f) {
-      const x = this.now() - f.at + APPROACH;          // forced trains arrive already braking into the stop
+      const x = this.now() - f.at + (f.approach ? 0 : APPROACH);   // forced trains arrive stopped, or come in
       if (x < APPROACH + DWELL + LEAVE) {
         const st = { k: -1, dir: 1, tanuki: f.tanuki, phase: 'stop', s: 0, doors: 0 };
-        if (x < APPROACH + DWELL) { const d = x - APPROACH; st.doors = Math.max(0, Math.min(1, d / 2, (DWELL - d) / 2)); }
+        if (x < APPROACH) { st.phase = 'in'; const q = 1 - x / APPROACH; st.s = -RUN * q * q; }
+        else if (x < APPROACH + DWELL) { const d = x - APPROACH; st.doors = Math.max(0, Math.min(1, d / 2, (DWELL - d) / 2)); }
         else { st.phase = 'out'; const q = (x - APPROACH - DWELL) / LEAVE; st.s = RUN * q * q; }
         return st;
       }

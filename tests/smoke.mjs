@@ -450,6 +450,32 @@ for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sa
   await page.screenshot({ path: `${out}/rail-tanuki.png` });
 }
 
+// Pointless treasure: walk onto the one in the nearest dead end
+{
+  await page.goto(base + '?level=0&play&day=2026-11-10');
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.treasure);
+  await page.evaluate(() => { window.__game.store.data.treasures = {}; window.__game.store.data.found = []; });
+  const t = await page.evaluate(() => {
+    const g = window.__game, l = g.treasure.list;
+    return { n: l.length, x: l[0].x, z: l[0].z, o: l[0].o, kind: l[0].kind };
+  });
+  console.log('treasure', t.n, 'dead ends; the first holds', t.kind);
+  if (t.n < 20) errors.push(`only ${t.n} treasures`);
+  // a portrait, then walk onto it
+  await page.goto(base + `?level=0&play&day=2026-11-10&x=${t.x + 1.1}&z=${t.z}&o=${t.o}&yaw=${Math.PI / 2}`);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.treasure);
+  await page.addStyleTag({ content: '#say{display:none!important}' });
+  await page.evaluate(() => { window.__game.S.pitch = 0.6; });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${out}/treasure.png` });
+  await page.addStyleTag({ content: '#say{display:block!important}' });
+  await page.evaluate(({ x, z, o }) => Object.assign(window.__game.S, { x, z, o }), t);
+  await page.waitForTimeout(400);
+  const got = await page.evaluate(() => ({ said: document.getElementById('say').textContent, kinds: Object.keys(window.__game.store.data.treasures || {}) }));
+  console.log('consolation prize', JSON.stringify(got.said.slice(0, 120)), JSON.stringify(got.kinds));
+  if (!/Consolation prize/.test(got.said) || !got.kinds.includes(t.kind)) errors.push(`walking onto a treasure didn't pick it up (${got.said})`);
+}
+
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

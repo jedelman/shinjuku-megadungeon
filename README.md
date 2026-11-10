@@ -52,6 +52,9 @@ Trains run on the real platforms (from OpenStreetMap), stop behind the platform 
 is a lot of tanuki pretending, stacked three high, after the old phantom-train tales. Goofy, blocky commuters shuffle
 through the concourses and wait on the platforms, and thin out at midnight inside the patches.
 
+Every dead end has a consolation prize: a pointless treasure (a marble, a one-yen coin, an empty soy-sauce fish, a key to
+nothing). They do nothing. You'll want them all.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.

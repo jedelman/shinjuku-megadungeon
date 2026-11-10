@@ -333,6 +333,28 @@ lifts and escalators). The pipeline:
 **Not yet:** alighting passengers, sound (an original melody per station, never the real ones), and trains between
 stations (step 4).
 
+## Pointless treasure (2026-11-10)
+
+Jason: "In addition to lost items we need pointless treasure. There's so many dead ends ... that we should put a little
+consolation prize in each one."
+
+- **Where.** `src/treasure.js` finds the real dead ends: network nodes with a single link, underground, on the walkable
+  floor and reachable. It leaves out exits, ticket gates and stair feet, which only look like dead ends because the
+  street isn't mapped. That's 57 on level 0, 109 on the Tokyo level and 70 on Astra's route.
+- **What.** Each holds one pointless treasure (24 kinds), its kind drawn from tonight's chart: a marble, a one-yen coin
+  ("It floats, if you lay it on water gently"), an empty soy-sauce fish from somebody's bento, a pressed cherry petal, a
+  key to nothing, a tanuki finger puppet wearing a leaf.
+- **Finding.** A pink sparkle marks each one. Walk onto it and it's yours.
+- **Keeping.** The `Store` keeps the collection (`treasures`, counts by kind) and which dead ends you've emptied tonight
+  (`found`), so restarting doesn't refill them. The finish card counts them.
+- **Use.** They do nothing. That's the point.
+
+Also in this change:
+- Tanuki are a little lighter and ×1.2, and the track bed and tunnel are pale concrete, so the parade shows from the
+  platform.
+- `node tests/parade.mjs` records the tanuki parade (webm, and mp4 with ffmpeg). `Trains.force(i, tanuki, approach)`
+  can start an arrival out in the tunnel.
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -383,6 +405,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **3d. Done 2026-11-10:** a chart makes the patch (addresses, replay, the time warp); the kitten's new proportions.
 - **3e. Done 2026-11-10:** critters: pigeons, black rats, geckos, pill bugs, swallows (field notes with sources).
 - **3f. Done 2026-11-10:** trains on OSM platforms (sometimes tanuki), platform doors, and a crowd.
+- **3g. Done 2026-11-10:** pointless treasure in every dead end.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 
