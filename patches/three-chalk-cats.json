@@ -1,0 +1,36 @@
+{
+  "name": "Three Chalk Cats",
+  "by": "Claude",
+  "kernel": "explore",
+  "idea": "Someone has been drawing cats in chalk, at exactly kitten height. Find them all.",
+  "rooms": [
+    {
+      "role": "heart",
+      "at": "any",
+      "say": [
+        "A chalk cat on the tiles, tail curled into a question mark. Under it, a number: 3.",
+        "So where are 1 and 2?"
+      ],
+      "then": ["That's 1 and 2. Back at the 3, its tail is pointing at something."],
+      "found": [
+        "With 1 and 2 found, you see where 3's tail points: a stamp pad tucked behind a pillar, the ink still wet.",
+        "You press a paw in it. A station stamp for your book."
+      ]
+    },
+    {
+      "role": "room",
+      "at": "any",
+      "say": ["A chalk cat, mid-stretch. Under it: 1."]
+    },
+    {
+      "role": "room",
+      "at": "exit",
+      "say": ["A chalk cat asleep in a loaf. Under it: 2."]
+    },
+    { "role": "blank" },
+    {
+      "role": "gate",
+      "say": ["Chalk paw prints walk off the edge of the floor and keep going."]
+    }
+  ]
+}

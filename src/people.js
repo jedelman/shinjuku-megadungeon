@@ -41,7 +41,7 @@ const SAYS = [
   'Excuse me… do you know the way to', 'Sorry, I think I am lost. Where is', 'I have been walking for ages. Which way is',
 ];
 
-function rng(seed) {
+export function rng(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -50,7 +50,7 @@ function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-function hash(s) {
+export function hash(s) {
   let h = 2166136261;
   for (const c of s) h = Math.imul(h ^ c.codePointAt(0), 16777619);
   return h >>> 0;
@@ -132,7 +132,7 @@ const mat = (tint, glow = 0) => {
   if (!white) { white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); white.needsUpdate = true; }
   return makeMaterial(white, { tint, glow });
 };
-function box(w, h, d, tint, y = 0, x = 0, z = 0) {
+export function box(w, h, d, tint, y = 0, x = 0, z = 0) {
   const g = new THREE.BoxGeometry(w, h, d);
   g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(g.attributes.position.count * 3).fill(1), 3));
   const m = new THREE.Mesh(g, mat(tint));
@@ -160,7 +160,7 @@ function label(text, fg, bg, w = 256, h = 64) {
 }
 
 const COATS = [0x3c4a5e, 0x6b3a3a, 0x4d5a3a, 0x2e2e33, 0x8a6a3a, 0x5a4a6e];
-function makePerson(coat) {
+export function makePerson(coat) {
   const g = new THREE.Group();
   const legs = [];
   for (const s of [-1, 1]) {
@@ -313,6 +313,7 @@ export class Store {
   save() { try { this.s?.setItem('md.progress', JSON.stringify(this.data)); } catch { /* private mode */ } }
   has(id) { return this.data.rewards.includes(id); }
   bump(k) { this.data[k] = (this.data[k] || 0) + 1; this.save(); }
+  stamp() { this.data.stamps++; this.save(); }
   reward() {
     this.data.returned++;
     const next = REWARDS.find((r) => !this.has(r.id));

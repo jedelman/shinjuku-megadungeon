@@ -93,6 +93,13 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   `md.visited.<station>`). Shinjuku's counter location is sourced (`LOST_AND_FOUND`); elsewhere it's a game
   placement at a real station office, and the game says so. `tests/people.test.js` covers plans, reachability,
   rewards and persistence; the smoke test runs pickup → return → reward and a wanderer before and after a visit.
+- `src/patches.js` + `patches/*.json`: the dungeon as a quilt, after Rise Up Comus (Joshy Mcroo), "The Elemental Level
+  of Megadungeon Construction". A patch is 4–5 rooms: a heart (kernel: explore / talk / run), rooms around it, one
+  blank the assembler stitches to another patch, and a gate (a real connector to another underground floor). Patches
+  name *kinds* of place, never coordinates; `sew()` is pure, seeded by level + date, and places up to four per level on
+  real places within a 75 m walk. Patches are data and may come from friends: `checkPatch()` enforces the recipe and
+  caps, the game escapes their text, and the content rules above apply to them. `tests/patches.test.js` checks every
+  file and every level; the smoke test plays each kernel. Format: `patches/README.md`.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered

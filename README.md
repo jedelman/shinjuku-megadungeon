@@ -22,6 +22,12 @@ That's the rule here. Two levels so far, each a real walk that never surfaces:
 Along the way: lost property (no use to a kitten, but its owner left word at the lost-and-found, and they'll
 give you something useful), and lost people you can help, if you've been where they're going.
 
+The dungeon itself is a quilt of **patches**, after Rise Up Comus's
+["The Elemental Level of Megadungeon Construction"](https://riseupcomus.blogspot.com/2026/09/the-elemental-level-of-megadungeon.html).
+Each patch has 4–5 rooms on real places: a heart with a reason to explore, talk or run, rooms around it, a blank that
+stitches it to the next patch, and a gate to another floor. They're sewn somewhere new each day. Patches are small
+JSON files written against kinds of place, so anyone can write one and it fits any station: see `patches/README.md`.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
@@ -46,6 +52,7 @@ Astra's route also uses 「歩行空間ネットワークデータ（都営地�
 （国土交通省）（https://ckan.hokonavi.go.jp）を加工して作成, Public Data License 1.0, and OpenStreetMap data,
 © OpenStreetMap contributors, under the ODbL. Its combined data file (`public/data/shinjuku-astra.json`) is
 therefore under the ODbL 1.0.
+Patch structure after Rise Up Comus (Joshy Mcroo), "The Elemental Level of Megadungeon Construction" (2026).
 Used under the Government of Japan Standard Terms of Use (2.0), compatible with CC BY 4.0. The map has
 been processed for this game: walls, collision and floor connections are derived from it.
 

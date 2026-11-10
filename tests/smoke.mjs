@@ -220,6 +220,70 @@ const ad = await page.evaluate(() => ({ done: window.__game.S.done, text: docume
 console.log('astra finish', JSON.stringify(ad));
 if (!ad.done) errors.push("finishing Astra's route failed");
 
+// The quilt (patches after Rise Up Comus): walk every patch's rooms, play each kernel, and look at a few
+await page.goto(base + '?level=0&play&day=2026-11-10');
+await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.quilt);
+const quilt = await page.evaluate(() => window.__game.quilt.patches.map((q) => ({
+  id: q.id, kernel: q.kernel, name: q.name, px: q.px, pz: q.pz,
+  rooms: q.rooms.map((r) => ({ role: r.role, x: r.x, z: r.z, o: r.o, prop: r.def.prop || null, propAt: r.propAt || null })),
+})));
+const props = await page.evaluate(() => { const q = window.__game.quilt; return [q.props, q.patches.reduce((n, x) => n + x.rooms.filter((r) => r.def.prop).length, 0)]; });
+if (props[0] !== props[1]) errors.push(`placed ${props[0]} of ${props[1]} props`);
+console.log('quilt', JSON.stringify(quilt.map((q) => `${q.name} (${q.kernel})`)));
+if (quilt.length < 3) errors.push(`only ${quilt.length} patches sewn on level 0`);
+const goTo = async (r) => {
+  await page.evaluate(({ x, z, o }) => { const g = window.__game; Object.assign(g.S, { x, z, o }); }, r);
+  await page.waitForTimeout(450);
+  return page.evaluate(() => document.getElementById('say').textContent);
+};
+const away = { x: 28.81, z: -426.74, o: -2 };
+for (const q of quilt) {
+  const heart = q.rooms.find((r) => r.role === 'heart');
+  const gate = q.rooms.find((r) => r.role === 'gate');
+  const rooms = q.rooms.filter((r) => r.role === 'room');
+  const stamps0 = await page.evaluate(() => window.__game.store.data.stamps);
+  let said;
+  if (q.kernel === 'explore') {
+    said = await goTo(heart);
+    for (const r of rooms) { await goTo(away); said = await goTo(r); }
+    await goTo(away);
+    said = await goTo(heart);
+  } else if (q.kernel === 'run') {
+    said = await goTo(heart);
+    const clock = await page.evaluate(() => window.__game.quilt.timer && window.__game.quilt.clock(window.__game.S));
+    if (!clock) errors.push(`${q.name}: the run's clock didn't start`);
+    said = await goTo(gate);
+  } else {
+    await goTo({ x: q.px, z: q.pz, o: heart.o });
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(300);
+    said = await page.evaluate(() => document.getElementById('say').textContent);
+    if (!/There's|Nothing dropped/.test(said)) errors.push(`${q.name}: listening gave no hint (${said})`);
+  }
+  const stamps1 = await page.evaluate(() => window.__game.store.data.stamps);
+  if (q.kernel !== 'talk' && stamps1 !== stamps0 + 1) errors.push(`${q.name}: no stamp for finishing its ${q.kernel} (${said})`);
+  const blank = await goTo(q.rooms.find((r) => r.role === 'blank'));
+  if (!/Chalked on the floor/.test(blank)) errors.push(`${q.name}: the blank has no stitch (${blank})`);
+  for (const r of q.rooms) { await goTo(away); await goTo(r); }
+  console.log('patch', q.name, JSON.stringify(said.slice(0, 110)), 'stamps', stamps0, '→', stamps1);
+}
+const walked = await page.evaluate(() => window.__game.quilt.walked);
+if (walked.length !== quilt.length) errors.push(`walked ${walked.length} of ${quilt.length} patches`);
+// stand back from a vending machine and look at it
+const vm = quilt.flatMap((q) => q.rooms.filter((r) => r.prop === 'vending' && r.propAt))[0];
+let pr = null;
+if (vm) {
+  const [px, pz] = vm.propAt, dx = vm.x - px, dz = vm.z - pz, d = Math.hypot(dx, dz) || 1;
+  pr = { x: px + (dx / d) * 2.6, z: pz + (dz / d) * 2.6, o: vm.o, yaw: Math.atan2(dx / d, dz / d) };
+}
+for (const [name, r] of [['quilt-prop', pr], ['quilt-talk', quilt.find((q) => q.kernel === 'talk') && { x: quilt.find((q) => q.kernel === 'talk').px + 2.5, z: quilt.find((q) => q.kernel === 'talk').pz, o: quilt.find((q) => q.kernel === 'talk').rooms[0].o }]]) {
+  if (!r) continue;
+  await page.goto(base + `?level=0&play&day=2026-11-10&x=${r.x}&z=${r.z}&o=${r.o}${r.yaw !== undefined ? `&yaw=${r.yaw}` : ''}`);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+  await page.waitForTimeout(1800);
+  await page.screenshot({ path: `${out}/${name}.png` });
+}
+
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();
 process.exit(errors.length ? 1 : 0);
