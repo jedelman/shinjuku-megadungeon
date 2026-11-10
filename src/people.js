@@ -130,7 +130,7 @@ export function box(w, h, d, tint, y = 0, x = 0, z = 0) {
   m.position.set(x, y, z);
   return m;
 }
-function ball(r, tint, y = 0, x = 0, z = 0) {
+export function ball(r, tint, y = 0, x = 0, z = 0) {
   const g = new THREE.SphereGeometry(r, 7, 5);
   g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(g.attributes.position.count * 3).fill(1), 3));
   const m = new THREE.Mesh(g, mat(tint));
@@ -298,13 +298,20 @@ export class People {
 export class Store {
   constructor(storage) {
     this.s = storage;
-    this.data = { rewards: [], returned: 0, helped: 0, stamps: 0 };
+    this.data = { rewards: [], returned: 0, helped: 0, stamps: 0, notes: [] };
     try { Object.assign(this.data, JSON.parse(storage?.getItem('md.progress') || '{}')); } catch { /* fresh */ }
   }
   save() { try { this.s?.setItem('md.progress', JSON.stringify(this.data)); } catch { /* private mode */ } }
   has(id) { return this.data.rewards.includes(id); }
   bump(k) { this.data[k] = (this.data[k] || 0) + 1; this.save(); }
   stamp() { this.data.stamps++; this.save(); }
+  // field notes: the creatures you've met; true the first time
+  note(id) {
+    if (!Array.isArray(this.data.notes)) this.data.notes = [];
+    if (this.data.notes.includes(id)) return false;
+    this.data.notes.push(id); this.save();
+    return true;
+  }
   reward() {
     this.data.returned++;
     const next = REWARDS.find((r) => !this.has(r.id));

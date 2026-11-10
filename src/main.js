@@ -7,6 +7,7 @@ import { LEVELS } from './levels.js';
 import { makeKitten } from './kitten.js';
 import { People, Store, places } from './people.js';
 import { Quilt, parseAddress } from './patches.js';
+import { Critters, SPECIES } from './critters.js';
 import { tonight, describe, longDate } from './sky.js';
 
 const params = new URLSearchParams(location.search);
@@ -83,7 +84,7 @@ scene.add(beacon);
 const input = new Input(canvas);
 const store = new Store((() => { try { return localStorage; } catch { return null; } })());
 const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
-let people = null, quilt = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
+let people = null, quilt = null, critters = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
   ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0, speed: 0,
@@ -106,6 +107,9 @@ function spawn() {
   // ?patches=id@YYYY-MM-DD,... replays exact patches: a chart makes the patch
   const pick = params.get('patches') ? params.get('patches').split(',').filter((a) => parseAddress(a)) : null;
   quilt = new Quilt(scene, data, level, route, sky, store, people, nav, pick && pick.length ? pick : null);
+  // the small animals of the station, where their lives would put them
+  critters?.dispose();
+  critters = new Critters(scene, data, level, route, sky, store, quilt.patches, nav);
   visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
@@ -299,6 +303,7 @@ function finish() {
     (people.helped ? `<br>You helped ${people.helped} ${people.helped > 1 ? 'people' : 'person'} find their way.` : '') +
     (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '') +
     `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.` +
+    `<br>Field notes: ${(store.data.notes || []).length} of ${Object.keys(SPECIES).length} creatures.` +
     (quilt.patches.length ? `<br><a href="?level=${levelIndex}&amp;play&amp;patches=${encodeURIComponent(quilt.addresses().join(','))}">Replay tonight's patches</a>: ${quilt.addresses().map(esc).join(' · ')}` : '');
   void n;
 }
@@ -343,6 +348,7 @@ function draw(time, dt) {
 
   people?.update(dt, S, time);
   quilt?.update(dt, S, time);
+  if (S.state === 'play' && !S.done) { const met = critters?.update(dt, S, time) || []; if (met.length) say(met); }
   ps1.render(scene, camera);
   hud();
 }
@@ -487,4 +493,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };

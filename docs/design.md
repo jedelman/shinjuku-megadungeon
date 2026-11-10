@@ -251,6 +251,35 @@ proportions; the coat, the yellow pack and the wand are hers, and she's not a mo
 
 Strides shrank with the legs (walk 0.15 m, trot 0.26 m, gallop 0.57 m), so her paws still plant, and she scurries.
 
+## Critters: the station's small animals (2026-11-10)
+
+Jason: "Let's start to populate the megadungeon. What other critters are cute and inhabit subways?" The first five are
+real urban animals in Japan.
+- **Where they live** is a game ecology read off the real station (depth = walk to an exit plus its climb). It isn't
+  survey data.
+- **Field notes.** Each species' facts carry their sources in code (`SOURCES` in `src/critters.js`), and a test fails
+  if a species has none. The game shows them as field notes the first time you meet each animal.
+- **Placement.** `census()` is pure, seeded by tonight's chart. Animals live within 28 m of the level's route, where
+  you'll meet them.
+
+| Species | Where | How you meet it | Field note facts (sources in code) |
+|---|---|---|---|
+| ドバト feral pigeon | flocks of 3–5 within 12 m of the street | zoom at them and the flock goes up and lands a way off; a slow kitten can walk right up | feral rock doves: cliff-crevice birds kept by people (homing pigeons among them) that went wild worldwide. Suntory bird encyclopedia, Bird Research News |
+| クマネズミ black rat | the deep end of the level (≥ 12 m, the deepest 40%) | runs from a running kitten; sit still and one comes right up | wary, good at heights, nests in ceilings and walls. Minato City |
+| ニホンヤモリ Japanese gecko | on a wall 1.5–2.6 m up, within 30 m of the street | darts along the wall if you come too close | "house guard", lives near people, hunts insects at lights at night. Ministry of the Environment (Kōkyo Gaien); came from China about 3,000 years ago and spread east with people. Tohoku University, 2022 |
+| オカダンゴムシ pill bug | at the foot of a wall, ≥ 8 m deep | bump it and it rolls into a ball and goes rolling | rolls into an almost perfect sphere to protect itself (Kanagawa Prefectural Museum); arrived in Japan probably after the Meiji era (Nagoya City) |
+| ツバメ swallow | a nest over the heart of each patch whose night falls April–August | a parent circles, three chicks open their beaks, a droppings board below | nests in stations because the crowds keep predators away; railways (Keio) put boards under nests spring to summer. Traffic News, Tetsudo Channel |
+
+- **Drawn bigger than life:** geckos, pill bugs and swallows, so a 240-line screen shows them.
+- **Not yet:**
+  - Tanuki: they live in the 23 wards and use railway tracks as trails at night.
+  - The huntsman spider (アシダカグモ, "Sergeant"): a harmless cockroach hunter, but not everyone's idea of cute.
+  - A train-riding animal for the network step. That idea comes from Moscow's metro dogs (outside Tokyo; the research
+    is dated).
+- **Left out on purpose:**
+  - Cockroaches.
+  - The London Underground mosquito. Not cute, and a 2025 *Science* study found it didn't evolve in the Tube after all.
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -299,6 +328,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **3b. Done 2026-11-10:** patches (above): four of them, sewn daily onto every level.
 - **3c. Done 2026-11-10:** the underworld: tonight's horoscope deals a tarot spread onto the patches by real depth; wand portals.
 - **3d. Done 2026-11-10:** a chart makes the patch (addresses, replay, the time warp); the kitten's new proportions.
+- **3e. Done 2026-11-10:** critters: pigeons, black rats, geckos, pill bugs, swallows (field notes with sources).
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 

@@ -122,6 +122,12 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
     tonight's), and tests pin addresses. Tonight's sky picks each patch's date (redrawing until it lies clear) and still
     deals the cards. Inside a patch you're in its night: its date on the HUD, its season's fog, and its season drifting
     down (petals, fireflies, osmanthus, ginkgo, snow).
+- `src/critters.js`: the station's small animals: ドバト pigeons by the exits, クマネズミ black rats in the deep (they come to a
+  still kitten), ニホンヤモリ geckos on walls by the lights, オカダンゴムシ pill bugs that roll up when bumped, and ツバメ
+  swallows nesting over patches whose night is April–August. `census()` is pure, seeded by tonight's chart; placement
+  is a game ecology by depth, not survey data. **Every field-note fact has a source URL in `SOURCES`**
+  (`tests/critters.test.js` enforces it): don't add a fact you haven't checked. The `Store` keeps field notes
+  (`notes`).
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered
