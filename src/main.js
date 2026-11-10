@@ -11,41 +11,55 @@ const $ = (id) => document.getElementById(id);
 
 const floorName = (o) => (o < 0 ? `B${-o}F` : o === 0 ? 'Street' : `${o}F`);
 const RADIUS = 0.12; // a kitten fits through gaps people don't
-const KIND_NAME = { 4: 'Lift', 5: 'Escalator', 6: 'Stairs' };
+const KIND_NAME = { 4: 'Lift', 5: 'Escalator', 6: 'Stairs', 7: 'Slope' };
 const COLD = { fog: new THREE.Color(0x1b2430), range: new THREE.Vector2(1, 14) };
 const WARM = { fog: shared.uFog.value.clone(), range: shared.uFogRange.value.clone() };
 
-const data = await fetch('data/shinjuku.json').then((r) => r.json());
-const world = new World(data);
-const level = LEVELS[0];
+// goal marker: a soft column of light at the gate
+const beacon = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.5, 0.5, CH, 6, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0x9fe3c8, transparent: true, opacity: 0.35, depthWrite: false }),
+);
 
-// goal: the named gate(s)
-const goalGates = data.gates.filter((g) => g.n === level.goal.gate && g.o === level.goal.o);
-const goal = {
-  x: goalGates.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / goalGates.length,
-  z: goalGates.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / goalGates.length,
-  o: level.goal.o,
-};
-const goalNode = nearestNode(data, goal.x, goal.z, goal.o);
-const route = distancesTo(data, goalNode, { underground: true });
-
-// connector ends, per floor
+// ---- the level: its station's data, the goal gate, the route there, the floor connectors
+let data, world, level, goal, route;
 const ends = new Map();
-data.conns.forEach((c, i) => {
-  for (const [here, there, fwd] of [[c.a, c.b, true], [c.b, c.a, false]]) {
-    const [x, z, o] = data.nodes[here];
-    const k = floorKey(o);
-    if (!ends.has(k)) ends.set(k, []);
-    ends.get(k).push({ x, z, o, to: data.nodes[there][2], conn: i, fwd, t: c.t });
-  }
-});
-
 const navs = new Map();
+const cache = new Map();
 const nav = (o) => {
   const k = floorKey(o);
   if (!navs.has(k)) navs.set(k, new FloorNav(data.floors[k] || { walls: [], outdoor: [] }));
   return navs.get(k);
 };
+
+async function loadLevel(i) {
+  const L = LEVELS[i];
+  if (!cache.has(L.station)) cache.set(L.station, fetch(`data/${L.station}.json`).then((r) => r.json()));
+  const d = await cache.get(L.station);
+  if (world) for (const g of world.groups.values()) if (g.parent) g.parent.remove(g);
+  if (!world || data !== d) { data = d; world = new World(d); navs.clear(); }
+  level = L;
+  const gs = data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
+  goal = {
+    x: gs.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gs.length,
+    z: gs.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gs.length,
+    o: L.goal.o,
+  };
+  route = distancesTo(data, nearestNode(data, goal.x, goal.z, goal.o), { underground: true });
+  ends.clear();
+  data.conns.forEach((c, ci) => {
+    for (const [here, there, fwd] of [[c.a, c.b, true], [c.b, c.a, false]]) {
+      const [x, z, o] = data.nodes[here];
+      const k = floorKey(o);
+      if (!ends.has(k)) ends.set(k, []);
+      ends.get(k).push({ x, z, o, to: data.nodes[there][2], conn: ci, fwd, t: c.t });
+    }
+  });
+  beacon.position.set(goal.x, goal.o * FH + CH / 2, goal.z);
+}
+
+let levelIndex = Math.max(0, Math.min(LEVELS.length - 1, Number(params.get('level') ?? 0)));
+await loadLevel(levelIndex);
 
 // ---- scene
 const canvas = $('c');
@@ -56,12 +70,6 @@ const camera = new THREE.PerspectiveCamera(68, 16 / 9, 0.03, 80);
 const kitten = makeKitten();
 scene.add(kitten.root);
 
-// goal marker: a soft column of light at the gate
-const beacon = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.5, 0.5, CH, 6, 1, true),
-  new THREE.MeshBasicMaterial({ color: 0x9fe3c8, transparent: true, opacity: 0.35, depthWrite: false }),
-);
-beacon.position.set(goal.x, goal.o * FH + CH / 2, goal.z);
 scene.add(beacon);
 
 // ---- state
@@ -146,7 +154,8 @@ function frame(now) {
   input.poll();
 
   if (S.state === 'title') {
-    if (input.any || input.act) start();
+    if ((input.any || input.act) && !titleKeyUsed) start();
+    titleKeyUsed = false;
   } else {
     if (input.restart) spawn();
     S.yaw -= input.look[0];
@@ -306,14 +315,42 @@ function hud() {
   if (params.has('fps')) $('fps').textContent = `${S.fps} fps · ${shared.uRes.value.x}×${shared.uRes.value.y}`;
 }
 
-function start() {
-  if (S.state === 'play') return;
+let starting = false;
+async function start(i = levelIndex) {
+  if (S.state === 'play' || starting) return;
+  starting = true;
+  levelIndex = i;
+  if (LEVELS[i] !== level) {
+    $('loading').hidden = false;
+    $('loading').textContent = `${LEVELS[i].place} · loading the dungeon…`;
+    await loadLevel(i);
+    $('loading').hidden = true;
+  }
   S.state = 'play';
+  starting = false;
   $('title').hidden = true;
   $('hud').hidden = false;
   spawn();
   updateFsButton();
 }
+
+// level cards on the title
+function renderLevels() {
+  $('levels').innerHTML = LEVELS.map((L, i) =>
+    `<button class="level${i === levelIndex ? ' on' : ''}" data-i="${i}"><b>Level ${i} · ${L.place}</b><span>${L.title}</span><em>${L.length}</em></button>`).join('');
+}
+renderLevels();
+let titleKeyUsed = false;
+addEventListener('keydown', (e) => {
+  if (S.state !== 'title') return;
+  const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+  const digit = /^Digit\d$/.test(e.code) ? Number(e.code.slice(5)) : NaN;
+  if (step || LEVELS[digit]) {
+    levelIndex = step ? (levelIndex + step + LEVELS.length) % LEVELS.length : digit;
+    renderLevels();
+    titleKeyUsed = true;
+  }
+});
 
 // Fullscreen has to be asked for inside a user gesture (a tap or click handler), never from the render loop.
 function goFullscreen() {
@@ -332,7 +369,8 @@ document.addEventListener('fullscreenchange', updateFsButton);
 // The title card sits on top of the canvas, so it takes the tap itself (the canvas never sees it).
 $('title').addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'mouse') { input.mode = 'touch'; goFullscreen(); }
-  start();
+  const card = e.target.closest('.level');
+  start(card ? Number(card.dataset.i) : levelIndex);
 });
 $('fs').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); goFullscreen(); });
 $('act').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); input.pressAct(); });
@@ -347,4 +385,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, data, goal, route, start, spawn, camera, shared, nav };
+window.__game = { S, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };

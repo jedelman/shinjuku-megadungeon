@@ -12,7 +12,7 @@ links, and the data survey. Its CLAUDE.md sets the daily-journal convention, whi
 
 ```bash
 npm install                 # .npmrc sets legacy-peer-deps (npm's resolver trips on vitest's optional peers)
-npm run data                # rebuild public/data/shinjuku.json from the raw zip (needs: pip install pyshp shapely)
+npm run data                # rebuild public/data/{shinjuku,tokyo}.json from the raw zips (needs: pip install pyshp shapely)
 npm test                    # vitest: data, level 0's route, collision, kitten clips bind + animate
 npm run build               # dist/
 npx vite preview --port 4173 &  node tests/smoke.mjs   # headless Chromium: screenshots, rides, outside, finish
@@ -24,10 +24,11 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 
 ## Data and licences: these rules are not optional
 
-- **MLIT indoor map** (`data/raw/`, `public/data/shinjuku.json`): 政府標準利用規約（第2.0版）, compatible
+- **MLIT indoor maps** (`data/raw/`, `public/data/{shinjuku,tokyo}.json`): 政府標準利用規約（第2.0版）, compatible
   with CC BY 4.0. Copying, adapting and commercial use are allowed **with both credit lines**, verbatim:
   「出典：国土交通省 高精度測位社会プロジェクト」 and, because we process it,
   「「新宿駅周辺屋内地図データ」（国土交通省）（https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2）を加工して作成」.
+  Tokyo's second line is the same with 「東京駅周辺屋内地図データ」 and `mlit-indoor-tokyo-r2`.
   Never present the result as made by the government. Logos are outside the licence.
 - **OpenStreetMap** (not used yet): ODbL. When it arrives, keep it in its own files (`data/osm/`) with an
   ODbL notice and "© OpenStreetMap contributors" in the game's credits. Don't mix it into the MLIT JSON.
@@ -56,6 +57,12 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 
 ## How it's built
 
+- **Stations:** `tools/build_mlit.py <zip> <out> <station>` with an origin per station in `STATIONS` (Shinjuku's
+  must never move: levels use its coordinates). A floor directory can hold several file sets, one per
+  sub-facility; Tokyo's subway folder has one per station, labelled in `SUBSET_EN` (each checked against real
+  station coordinates). Levels live in `src/levels.js` with a `station`; `main.js` loads
+  `data/<station>.json` per level, and the title card lists the levels. `tests/tokyo.test.js` checks every level's
+  goal gate, start and route, and that each card's length is honest.
 - `tools/build_mlit.py`: zip (Shift-JIS names) → JSON in local metres. Walkable area per floor = floor
   outlines (seams < 0.8 m closed) minus solid rooms, voids and columns; walkway spaces win over rooms
   drawn on top of them. **The walking network is ground truth for connectivity:** its links are carved

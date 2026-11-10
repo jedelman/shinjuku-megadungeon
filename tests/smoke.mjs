@@ -114,6 +114,36 @@ await page.screenshot({ path: `${out}/done.png` });
 console.log('finish', JSON.stringify(done));
 if (!done.done) errors.push('finishing the level failed');
 
+
+// Tokyo: choose it on the title with the keyboard, then visit the route and finish it
+await page.goto(base);
+await page.waitForFunction(() => window.__game && document.getElementById('loading').hidden);
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(200);
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => window.__game.S.state === 'play' && window.__game.level.station === 'tokyo', null, { timeout: 60000 });
+await page.waitForTimeout(1500);
+const t0 = await page.evaluate(() => ({ where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent, x: window.__game.S.x }));
+await page.screenshot({ path: `${out}/tokyo-start.png` });
+console.log('tokyo via title', JSON.stringify(t0));
+if (!t0.goal.includes('大手町')) errors.push('Tokyo level did not load from the title');
+for (const [name, x, z, o] of [['tokyo-33', -376.5, 949.53, -1], ['tokyo-66', -452.66, -23.68, -1], ['tokyo-90', -135.34, -462.15, -2]]) {
+  await page.goto(base + `?level=1&play&fps&x=${x}&z=${z}&o=${o}`);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+  await page.waitForTimeout(2000);
+  const st = await page.evaluate(() => ({ fps: window.__game.S.fps, where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }));
+  await page.screenshot({ path: `${out}/${name}.png` });
+  console.log(name, JSON.stringify(st));
+}
+await page.goto(base + '?level=1&play');
+await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+await page.evaluate(() => { const g = window.__game; g.S.x = g.goal.x + 2; g.S.z = g.goal.z; g.S.o = g.goal.o; });
+await page.keyboard.down('KeyW'); await page.waitForTimeout(400); await page.keyboard.up('KeyW');
+await page.waitForTimeout(500);
+const td = await page.evaluate(() => ({ done: window.__game.S.done, text: document.getElementById('done-text').textContent }));
+console.log('tokyo finish', JSON.stringify(td));
+if (!td.done) errors.push('finishing the Tokyo level failed');
+
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

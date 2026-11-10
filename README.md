@@ -11,8 +11,11 @@ It started from one question on Bluesky ([@astrra.space](https://bsky.app/profil
 You're a kitten, 30 cm tall, with a backpack and a magic wand. At that size the station is about six
 times bigger than it is for everyone else.
 
-That's the rule here. **Level 0:** from the foot of the Seibu Shinjuku stairs on B2 to the Keio New Line
-gate on B1, about 1.1 km, without going up to the street.
+That's the rule here. Two levels so far, each a real walk that never surfaces:
+
+- **Level 0 · 新宿 Shinjuku:** from the foot of the Seibu Shinjuku stairs on B2 to the Keio New Line gate on B1, 1.1 km.
+- **Level 1 · 東京 Tokyo:** from Higashi-Ginza's Tsukiji-side gate (Hibiya line) to Otemachi's 大手町二丁目方面改札,
+  2.7 km through the Ginza, Hibiya, Yurakucho, Nijubashimae and Otemachi concourses.
 
 ## Play
 
@@ -33,6 +36,7 @@ npm run dev
 
 Map data: 出典：国土交通省 高精度測位社会プロジェクト.
 「新宿駅周辺屋内地図データ」（国土交通省）（https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2）を加工して作成.
+「東京駅周辺屋内地図データ」（国土交通省）（https://www.geospatial.jp/ckan/dataset/mlit-indoor-tokyo-r2）を加工して作成.
 Used under the Government of Japan Standard Terms of Use (2.0), compatible with CC BY 4.0. The map has
 been processed for this game: walls, collision and floor connections are derived from it.
 
