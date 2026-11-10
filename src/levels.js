@@ -19,4 +19,17 @@ export const LEVELS = [
     start: { x: 88.59, z: 1406.06, o: -1, yaw: Math.PI }, // Higashi-Ginza, by the Tsukiji-side gate
     goal: { gate: '大手町二丁目方面改札', o: -1, radius: 6 },
   },
+  {
+    // Astra's question (@astrra.space, 2026-11-10): "i wonder if you can walk all the way from shinjuku-sanchome to
+    // nishishinjuku only using underground passages (so, no trains and no going outside)". kira's answer:
+    // 新宿三丁目 → メトロプロムナード → 新宿西口地下広場 → 都庁前 → ... → 西新宿. Built from MLIT + ほこナビ + OSM (ODbL).
+    id: 'astra-sanchome-to-nishi-shinjuku',
+    station: 'shinjuku-astra',
+    region: 'shinjuku',            // same station as level 0: places you've been count in both
+    place: "新宿 Astra's route",
+    title: '新宿三丁目 → 西新宿, no trains, no going outside',
+    length: '1.8 km',
+    start: { x: 376.08, z: -18.05, o: -2, yaw: Math.PI }, // Shinjuku-sanchome (Marunouchi line)
+    goal: { at: { x: -652.75, z: -375.17 }, o: -1, name: '西新宿駅', radius: 8 },
+  },
 ];

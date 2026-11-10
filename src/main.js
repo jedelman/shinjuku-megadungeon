@@ -40,12 +40,16 @@ async function loadLevel(i) {
   if (world) for (const g of world.groups.values()) if (g.parent) g.parent.remove(g);
   if (!world || data !== d) { data = d; world = new World(d); navs.clear(); }
   level = L;
-  const gs = data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
-  goal = {
-    x: gs.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gs.length,
-    z: gs.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gs.length,
-    o: L.goal.o,
-  };
+  if (L.goal.at) goal = { x: L.goal.at.x, z: L.goal.at.z, o: L.goal.o };   // a place, not a named gate
+  else {
+    const gs = data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
+    goal = {
+      x: gs.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gs.length,
+      z: gs.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gs.length,
+      o: L.goal.o,
+    };
+  }
+  goal.name = L.goal.name || L.goal.gate;
   route = distancesTo(data, nearestNode(data, goal.x, goal.z, goal.o), { underground: true });
   ends.clear();
   data.conns.forEach((c, ci) => {
@@ -94,7 +98,7 @@ function spawn() {
   $('done').hidden = true;
   people?.dispose();
   people = new People(scene, data, level, route, params.get('day') || today, store);
-  visited = store.visited(level.station);
+  visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
   showFloors();
@@ -265,7 +269,7 @@ function finish() {
   const mm = Math.floor(S.t / 60), ss = String(Math.floor(S.t % 60)).padStart(2, '0');
   $('done').hidden = false;
   $('done-text').innerHTML =
-    `Arrived at <b>${level.goal.gate}</b>.<br>` +
+    `Arrived at <b>${goal.name}</b>.<br>` +
     `The map says ${mapDist.toLocaleString()} m without surfacing. You walked ${Math.round(S.walked).toLocaleString()} m in ${mm}:${ss}.<br>` +
     (S.surfaced ? `You went outside ${S.surfaced} time${S.surfaced > 1 ? 's' : ''}. It was cold.` : 'You never went outside.') +
     (people.returned ? `<br>You returned ${people.returned} thing${people.returned > 1 ? 's' : ''} to ${people.returned > 1 ? 'their owners' : 'its owner'}.` : '') +
@@ -372,7 +376,7 @@ function hud() {
     if (k !== ni) arrow = Math.atan2(data.nodes[k][0] - S.x, data.nodes[k][1] - S.z);
   }
   const mm = Math.floor(S.t / 60), ss = String(Math.floor(S.t % 60)).padStart(2, '0');
-  $('goal').textContent = `${level.goal.gate} · ${dist} · ${mm}:${ss}`;
+  $('goal').textContent = `${goal.name} · ${dist} · ${mm}:${ss}`;
   const ar = $('arrow');
   ar.hidden = arrow === null;
   if (arrow !== null) ar.style.transform = `rotate(${(-(arrow - S.yaw) + Math.PI) % (Math.PI * 2)}rad)`;

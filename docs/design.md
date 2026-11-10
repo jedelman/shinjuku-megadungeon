@@ -123,7 +123,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 
 - **0 (this PR).** Pipeline, PS1 renderer, walkable Shinjuku on all floors, stairs/escalators/lifts, the
   outside rule, keyboard/gamepad/touch, landscape, and level 0: Seibu B2 → 京王新線口, 1.1 km.
-- **1.** Astra's route. West: the Tochomae floor plans (ほこナビ) plus the 2021 network's underground passage.
+- **1. Done 2026-11-10 as level 2 (1,785 m never surfacing; kira's A17 dead-end is consistent with the data).** Astra's route. West: the Tochomae floor plans (ほこナビ) plus the 2021 network's underground passage.
   East: OSM's Metro Promenade to Sanchome. Nishi-Shinjuku and E9 from OSM. Stitch onto the MLIT core, then
   verify kira's "A17 dead-ends" claim against the data. Use PLATEAU's elevations for true floor depths.
 - **2.** Lost property and runs: finds, use or return, the lost-and-found counter, the daily seed.

@@ -30,10 +30,11 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   「「新宿駅周辺屋内地図データ」（国土交通省）（https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2）を加工して作成」.
   Tokyo's second line is the same with 「東京駅周辺屋内地図データ」 and `mlit-indoor-tokyo-r2`.
   Never present the result as made by the government. Logos are outside the licence.
-- **OpenStreetMap** (not used yet): ODbL. When it arrives, keep it in its own files (`data/osm/`) with an
-  ODbL notice and "© OpenStreetMap contributors" in the game's credits. Don't mix it into the MLIT JSON.
-  From cloud sessions, Overpass is blocked by the network policy, but the main API works:
-  `https://api.openstreetmap.org/api/0.6/map?bbox=...` for station-sized boxes. Don't route around the block.
+- **OpenStreetMap** (`data/osm/`, ODbL 1.0, "© OpenStreetMap contributors" in the game's credits): used for
+  Astra's route. `tools/build_astra.py` merges it with MLIT + ほこナビ into `public/data/shinjuku-astra.json`, which is
+  therefore an ODbL derivative database (its `meta.license` says so). Keep OSM out of the MLIT-only files
+  (`shinjuku.json`, `tokyo.json`). From cloud sessions, Overpass is blocked by the network policy, but the main API
+  works: `https://api.openstreetmap.org/api/0.6/map?bbox=...` for station-sized boxes. Don't route around the block.
 - **ほこナビ walking-network data** (`data/raw/hokonavi/`): Public Data License 1.0 (CC BY 4.0-compatible).
   Credit each dataset and say we processed it; see that folder's README. The three Oedo station sets are a
   limited release (gone from the portal after 2027-03-12), which is why they're committed.
@@ -63,6 +64,12 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   station coordinates). Levels live in `src/levels.js` with a `station`; `main.js` loads
   `data/<station>.json` per level, and the title card lists the levels. `tests/tokyo.test.js` checks every level's
   goal gate, start and route, and that each card's length is honest.
+- **Astra's route** (`tools/build_astra.py`, level 2): MLIT's Shinjuku core plus ほこナビ's Tochomae floor plans and
+  network, the 2021 network's underground links, and OSM underground walkways at both ends, all in Shinjuku's frame,
+  through `build_mlit.main(..., extra=...)`. Stitching is narrow on purpose: different sources within 3 m on a floor;
+  OSM dead ends join the nearest node within 15 m (mapping gaps); and **one explicit level seam** (Times Avenue's
+  end, OSM level −1, is Tochomae's B2). Don't add generic cross-level joins: a generic rule caught four spots nobody
+  could vouch for. Connectors are traced through branching stair landings (Toei Tochomae's branch).
 - `tools/build_mlit.py`: zip (Shift-JIS names) → JSON in local metres. Walkable area per floor = floor
   outlines (seams < 0.8 m closed) minus solid rooms, voids and columns; walkway spaces win over rooms
   drawn on top of them. **The walking network is ground truth for connectivity:** its links are carved
