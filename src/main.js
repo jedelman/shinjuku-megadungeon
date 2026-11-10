@@ -5,6 +5,7 @@ import { FloorNav, floorKey, distancesTo, nearestNode } from './nav.js';
 import { Input } from './input.js';
 import { LEVELS } from './levels.js';
 import { makeKitten } from './kitten.js';
+import { People, Store, places } from './people.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -74,6 +75,9 @@ scene.add(beacon);
 
 // ---- state
 const input = new Input(canvas);
+const store = new Store((() => { try { return localStorage; } catch { return null; } })());
+const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
+let people = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
   ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0, speed: 0,
@@ -88,7 +92,27 @@ function spawn() {
   Object.assign(S, { x: sp.x, z: sp.z, o: sp.o, yaw: sp.yaw, head: sp.yaw + Math.PI, ride: null, outside: false,
     surfaced: 0, walked: 0, t0: null, t: 0, done: false });
   $('done').hidden = true;
+  people?.dispose();
+  people = new People(scene, data, level, route, params.get('day') || today, store);
+  visited = store.visited(level.station);
+  placeList = places(data);
+  applyRewards();
   showFloors();
+}
+
+// what owners gave back changes how you play
+function applyRewards() {
+  const lantern = store.has('lantern');
+  WARM.range.set(lantern ? 5 : 3, lantern ? 62 : 38);
+  $('map').hidden = !store.has('map');
+}
+
+function say(lines) {
+  if (!lines.length) return;
+  const esc = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  $('say').innerHTML = lines.map(esc).join('<br>');
+  $('say').hidden = false;
+  sayUntil = performance.now() + 2600 + 1700 * lines.length;
 }
 
 // face the way the route goes, a few nodes ahead
@@ -195,7 +219,7 @@ function update(dt) {
   const [mx, my] = input.move;
   const fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw);
   const vx = (-fz * mx + fx * my), vz = (fx * mx + fz * my);
-  const speed = input.run ? 6.5 : 2.4;   // a trot, and zoomies
+  const speed = input.run ? (store.has('boots') ? 8 : 6.5) : 2.4;   // a trot, and zoomies (faster in boots)
   if (Math.hypot(vx, vz) > 0.05) {
     if (S.t0 === null) S.t0 = performance.now();
     const n = nav(S.o);
@@ -218,8 +242,16 @@ function update(dt) {
     }
   }
   if (input.act) {
-    const e = nearestEnd();
-    if (e) startRide(e);
+    const pn = people?.nearest(S);
+    if (pn) { say(people.act(pn, visited.set)); applyRewards(); }
+    else { const e = nearestEnd(); if (e) startRide(e); }
+  }
+  // places you've been: a lost person can only be helped to somewhere you know
+  if (performance.now() - lastPlaceCheck > 250) {
+    lastPlaceCheck = performance.now();
+    for (const p of placeList) {
+      if (p.o === S.o && Math.hypot(p.x - S.x, p.z - S.z) < 8 && visited.add(p.key) && performance.now() > sayUntil) say([`New place: ${p.name}`]);
+    }
   }
   if (S.t0 !== null) S.t = (performance.now() - S.t0) / 1000;
   if (S.o === goal.o && Math.hypot(S.x - goal.x, S.z - goal.z) < level.goal.radius) finish();
@@ -235,7 +267,9 @@ function finish() {
   $('done-text').innerHTML =
     `Arrived at <b>${level.goal.gate}</b>.<br>` +
     `The map says ${mapDist.toLocaleString()} m without surfacing. You walked ${Math.round(S.walked).toLocaleString()} m in ${mm}:${ss}.<br>` +
-    (S.surfaced ? `You went outside ${S.surfaced} time${S.surfaced > 1 ? 's' : ''}. It was cold.` : 'You never went outside.');
+    (S.surfaced ? `You went outside ${S.surfaced} time${S.surfaced > 1 ? 's' : ''}. It was cold.` : 'You never went outside.') +
+    (people.returned ? `<br>You returned ${people.returned} thing${people.returned > 1 ? 's' : ''} to ${people.returned > 1 ? 'their owners' : 'its owner'}.` : '') +
+    (people.helped ? `<br>You helped ${people.helped} ${people.helped > 1 ? 'people' : 'person'} find their way.` : '');
   void n;
 }
 
@@ -276,19 +310,49 @@ function draw(time, dt) {
   shared.uFog.value.lerp(env.fog, 0.08);
   shared.uFogRange.value.lerp(env.range, 0.08);
 
+  people?.update(dt, S, time);
   ps1.render(scene, camera);
   hud();
 }
 
+// the folded station map (a reward): walls within 45 m, turned so that ahead is up
+let mapT = 0;
+function drawMap() {
+  const c = $('map'), g = c.getContext('2d'), W = c.width, R = 45, k = W / (2 * R);
+  const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw);
+  const P = (x, z) => { const dx = x - S.x, dz = z - S.z; return [W / 2 + (dx * cy - dz * sy) * k, W / 2 + (dx * sy + dz * cy) * k]; };
+  g.clearRect(0, 0, W, W);
+  g.fillStyle = 'rgba(10,12,14,0.72)'; g.fillRect(0, 0, W, W);
+  const n = nav(S.o);
+  g.strokeStyle = '#cfc8b4'; g.lineWidth = 1; g.beginPath();
+  for (const i of n.near(S.x, S.z, R)) {
+    const [x1, z1, x2, z2, kind] = n.walls[i];
+    if (kind === 'col') continue;
+    const [a, b] = P(x1, z1), [c2, d] = P(x2, z2);
+    g.moveTo(a, b); g.lineTo(c2, d);
+  }
+  g.stroke();
+  const dot = (x, z, col, r) => { let [a, b] = P(x, z); a = Math.max(r, Math.min(W - r, a)); b = Math.max(r, Math.min(W - r, b)); g.fillStyle = col; g.fillRect(a - r, b - r, 2 * r, 2 * r); };
+  if (people?.counter && people.counter.o === S.o) dot(people.counter.x, people.counter.z, '#5aa0e0', 3);
+  if (goal.o === S.o) dot(goal.x, goal.z, '#9fe3c8', 3);
+  g.fillStyle = '#f2c81c'; g.beginPath(); g.moveTo(W / 2, W / 2 - 5); g.lineTo(W / 2 - 4, W / 2 + 4); g.lineTo(W / 2 + 4, W / 2 + 4); g.fill();
+}
+
 function hud() {
   if (S.state !== 'play') return;
-  const e = !S.ride && nearestEnd();
+  const pn = !S.ride && !S.done && people?.nearest(S);
+  const e = !S.ride && !pn && nearestEnd();
   let prompt = '';
   if (S.done) prompt = '';
   else if (S.ride) prompt = `${KIND_NAME[S.ride.kind]} to ${floorName(S.ride.to)}…`;
+  else if (pn) prompt = `◆ ${pn.prompt}`;
   else if (e) prompt = `${e.to > S.o ? '▲' : '▼'} ${KIND_NAME[e.t]} to ${floorName(e.to)}`;
   $('prompt').textContent = prompt;
-  $('act').hidden = !(e && input.mode === 'touch');
+  $('act').hidden = !((e || pn) && input.mode === 'touch');
+  $('act').textContent = pn ? '◆' : '▲▼';
+  $('bag').textContent = people?.bag.length ? `bag × ${people.bag.length}` : '';
+  if (!$('say').hidden && performance.now() > sayUntil) $('say').hidden = true;
+  if (!$('map').hidden && performance.now() - mapT > 120) { mapT = performance.now(); drawMap(); }
 
   // where am I: floor + nearest named exit's facility
   let fac = '';
@@ -385,4 +449,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };

@@ -17,6 +17,9 @@ That's the rule here. Two levels so far, each a real walk that never surfaces:
 - **Level 1 · 東京 Tokyo:** from Higashi-Ginza's Tsukiji-side gate (Hibiya line) to Otemachi's 大手町二丁目方面改札,
   2.7 km through the Ginza, Hibiya, Yurakucho, Nijubashimae and Otemachi concourses.
 
+Along the way: lost property (no use to a kitten, but its owner left word at the lost-and-found, and they'll
+give you something useful), and lost people you can help, if you've been where they're going.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.

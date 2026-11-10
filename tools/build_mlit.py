@@ -131,7 +131,7 @@ def main(zpath, out, station="shinjuku"):
     root = extract(zpath, tmp)
     per = collections.defaultdict(lambda: {"floor": [], "floor_out": [], "solid": [], "solid_kind": [],
                                            "solid_cat": [], "walkway": [], "cols": []})
-    exits, gates = [], []
+    exits, gates, offices = [], [], []
     def read_set(files, fac, prefix=''):
             if "Floor" not in files:
                 return
@@ -151,6 +151,10 @@ def main(zpath, out, station="shinjuku"):
                         P["solid_cat"].append(rec.category)
                     elif rec.category in WALKWAY:
                         P["walkway"].append(g)
+                    if rec.category == "B018" and not g.is_empty:   # station offices: homes for the lost-and-found counter
+                        c = g.representative_point()
+                        offices.append({"n": (rec.name or "").strip(), "o": o, "x": r2(c.x), "z": r2(c.y),
+                                        "fac": SUBSET_EN.get(prefix) or FACILITY_EN.get(fac, fac.split('.', 1)[-1])})
             if "Fixture" in files:
                 xr = reader(files["Fixture"])
                 for s, rec in zip(xr.shapes(), xr.records()):
@@ -320,7 +324,7 @@ def main(zpath, out, station="shinjuku"):
             "license": "政府標準利用規約（第2.0版）, compatible with CC BY 4.0",
             "origin": [LON0, LAT0], "units": "metres, x east, z south",
         },
-        "floors": floors, "exits": exits, "gates": gates,
+        "floors": floors, "exits": exits, "gates": gates, "offices": offices,
         "nodes": nodes, "links": [[l["a"], l["b"], l["t"], l["d"]] for l in links], "conns": conns,
     }
     with open(out, "w", encoding="utf-8") as f:

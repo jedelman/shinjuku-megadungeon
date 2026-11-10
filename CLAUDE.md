@@ -80,6 +80,12 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   `makeClips()`; `tests/kitten.test.js` fails if a track names a joint that doesn't exist. **Not R3F:** R3F is
   a React renderer and adds no animation (drei's `useAnimations` wraps this same mixer). If React is ever
   wanted for other reasons, this module mounts as a `<primitive>` unchanged.
+- `src/people.js`: lost property, the lost-and-found counter (owners leave word there), and lost wanderers you
+  can help only if you've been to their destination. `plan()` is pure and seeded by level + date (`?day=` overrides
+  it for tests). `Store` keeps rewards, counts and visited places in localStorage (`md.progress`,
+  `md.visited.<station>`). Shinjuku's counter location is sourced (`LOST_AND_FOUND`); elsewhere it's a game
+  placement at a real station office, and the game says so. `tests/people.test.js` covers plans, reachability,
+  rewards and persistence; the smoke test runs pickup → return → reward and a wanderer before and after a visit.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered
