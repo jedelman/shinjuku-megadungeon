@@ -4,6 +4,9 @@
 // - affine texture mapping (WebGL2 has no `noperspective`, so carry uv*w and divide)
 // - 15-bit colour with a 4x4 Bayer dither on the blit
 // - short linear fog: it is the draw distance
+// - see-through walls: anything between the camera and the kitten turns to mesh (screen-door) transparency,
+//   the dithered see-through of PS1/Saturn games. The camera never has to jam into the player's back in a
+//   corner (Jason: "Getting cornered in Bloodborne sucks").
 import * as THREE from 'three';
 
 export const LINES = 240;
@@ -15,7 +18,9 @@ const vert = /* glsl */ `
   varying vec3 vUvW;
   varying vec3 vColor;
   varying float vDist;
+  varying vec3 vWorld;
   void main() {
+    vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     vDist = -mv.z;
     vec4 clip = projectionMatrix * mv;
@@ -38,7 +43,29 @@ const frag = /* glsl */ `
   varying vec3 vUvW;
   varying vec3 vColor;
   varying float vDist;
+  varying vec3 vWorld;
+  uniform vec3 uCam;
+  uniform vec3 uFocus;
+  uniform float uFade;
+  float bayer4(vec2 p) {
+    int x = int(mod(p.x, 4.0)), y = int(mod(p.y, 4.0));
+    int m[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
+    return (float(m[x + y * 4]) + 0.5) / 16.0;
+  }
+  // how solid this fragment should be: low inside a cone from the camera to the kitten, and right at the lens
+  float solidity() {
+    vec3 ab = uFocus - uCam;
+    float L2 = max(dot(ab, ab), 1e-4);
+    vec3 ap = vWorld - uCam;
+    float t = dot(ap, ab) / L2;
+    float d = length(ap - ab * clamp(t, 0.0, 1.0));
+    float r = mix(0.25, 0.95, clamp(t, 0.0, 1.0));       // narrow at the lens, wide enough at the kitten to see around it
+    float inside = (1.0 - smoothstep(r * 0.55, r, d)) * step(t, 0.97);
+    float lens = 1.0 - smoothstep(0.12, 0.45, length(ap));
+    return 1.0 - 0.82 * max(inside, lens);               // never fully gone: you still see where the wall is
+  }
   void main() {
+    if (uFade > 0.5 && bayer4(gl_FragCoord.xy) > solidity()) discard;
     vec2 uv = vUvW.xy / vUvW.z;
     vec4 tex = texture2D(uMap, uv);
     if (tex.a < 0.5) discard;
@@ -49,7 +76,7 @@ const frag = /* glsl */ `
   }
 `;
 
-export function makeMaterial(map, { tint = 0xffffff, glow = 0, side = THREE.FrontSide } = {}) {
+export function makeMaterial(map, { tint = 0xffffff, glow = 0, side = THREE.FrontSide, fade = false } = {}) {
   return new THREE.ShaderMaterial({
     vertexShader: vert,
     fragmentShader: frag,
@@ -62,6 +89,9 @@ export function makeMaterial(map, { tint = 0xffffff, glow = 0, side = THREE.Fron
       uFog: shared.uFog,
       uFogRange: shared.uFogRange,
       uGlow: { value: glow },
+      uFade: { value: fade ? 1 : 0 },
+      uCam: shared.uCam,
+      uFocus: shared.uFocus,
     },
   });
 }
@@ -72,6 +102,8 @@ export const shared = {
   uSnap: { value: 1 },
   uFog: { value: new THREE.Color(0xa9b19c) },
   uFogRange: { value: new THREE.Vector2(3, 38) },
+  uCam: { value: new THREE.Vector3() },    // camera position, for see-through walls
+  uFocus: { value: new THREE.Vector3() },  // what the camera must always see (the kitten)
 };
 
 const blitFrag = /* glsl */ `

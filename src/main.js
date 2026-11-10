@@ -242,22 +242,15 @@ function draw(time, dt) {
   const target = new THREE.Vector3(S.x, baseY + 0.22, S.z);
   const d0 = 1.5;
   const dx = Math.sin(S.yaw), dz = Math.cos(S.yaw);
-  const want = Math.cos(S.pitch) * d0;
-  let dh = want;
-  if (!S.ride && !S.outside) dh = Math.min(dh, nav(S.o).ray(S.x, S.z, dx, dz, dh) - 0.15);
-  dh = Math.max(0.35, dh);
-  let cy = target.y + Math.sin(S.pitch) * d0 * Math.max(0.3, dh / want);
+  // the camera keeps its distance and walls in the way turn see-through (ps1.js), so corners stay playable
+  const dh = Math.cos(S.pitch) * d0;
+  let cy = target.y + Math.sin(S.pitch) * d0;
   if (!S.outside) cy = Math.min(cy, (S.ride ? Math.max(S.o, S.ride.to) : S.o) * FH + CH - 0.2);
-  let cx = S.x + dx * dh, cz = S.z + dz * dh;
-  if (!S.ride && !S.outside) {
-    // the camera has a body too: keep it inside the walkable area and off the walls
-    const n = nav(S.o);
-    for (let i = 0; i < 10 && !n.inside(cx, cz); i++) { dh *= 0.75; cx = S.x + dx * dh; cz = S.z + dz * dh; }
-    [cx, cz] = n.clear(cx, cz, 0.2);
-    if (!n.inside(cx, cz)) { cx = S.x + dx * 0.3; cz = S.z + dz * 0.3; }
-  }
+  const cx = S.x + dx * dh, cz = S.z + dz * dh;
   camera.position.set(cx, cy, cz);
   camera.lookAt(target.x - dx * 0.6, target.y + 0.32, target.z - dz * 0.6);
+  shared.uCam.value.copy(camera.position);
+  shared.uFocus.value.set(S.x, baseY + 0.16, S.z);
 
   // draw only chunks the fog hasn't swallowed
   const reach = shared.uFogRange.value.y + 26;
@@ -314,16 +307,34 @@ function hud() {
 }
 
 function start() {
+  if (S.state === 'play') return;
   S.state = 'play';
   $('title').hidden = true;
   $('hud').hidden = false;
   spawn();
-  if (input.mode === 'touch') {
-    const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
-  }
+  updateFsButton();
 }
 
+// Fullscreen has to be asked for inside a user gesture (a tap or click handler), never from the render loop.
+function goFullscreen() {
+  const el = document.documentElement;
+  if (document.fullscreenElement || !el.requestFullscreen) return;
+  el.requestFullscreen({ navigationUI: 'hide' })
+    .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
+    .catch(() => {});
+}
+function updateFsButton() {
+  const can = !!document.documentElement.requestFullscreen;
+  $('fs').hidden = !(can && input.mode === 'touch' && !document.fullscreenElement && S.state === 'play');
+}
+document.addEventListener('fullscreenchange', updateFsButton);
+
+// The title card sits on top of the canvas, so it takes the tap itself (the canvas never sees it).
+$('title').addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'mouse') { input.mode = 'touch'; goFullscreen(); }
+  start();
+});
+$('fs').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); goFullscreen(); });
 $('act').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); input.pressAct(); });
 $('done').addEventListener('click', () => spawn());
 
@@ -336,4 +347,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, data, goal, route, start, spawn, camera, shared };
+window.__game = { S, data, goal, route, start, spawn, camera, shared, nav };
