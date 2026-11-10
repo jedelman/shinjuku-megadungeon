@@ -32,7 +32,7 @@ describe('patches (4–5 room elemental building blocks)', () => {
 describe('a chart makes the patch', () => {
   it('reads addresses, and only well-formed ones', () => {
     expect(parseAddress('the-last-shutter@1927-12-30')).toEqual({ id: 'the-last-shutter', date: '1927-12-30' });
-    for (const bad of ['the-last-shutter', 'the-last-shutter@1927-13-01', 'The Last Shutter@1927-12-30', '<b>@1927-12-30', '']) expect(parseAddress(bad)).toBeNull();
+    for (const bad of ['the-last-shutter', 'the-last-shutter@1927-13-01', 'The Last Shutter@1927-12-30', '<b>@1927-12-30', '', 'the-last-shutter@1995-03-20']) expect(parseAddress(bad)).toBeNull();
   });
   it('drifts the season of the patch\'s night', () => {
     expect(['1927-04-01', '1927-07-01', '1927-10-01', '1927-11-15', '1927-12-30'].map(drift)).toEqual(['sakura', 'fireflies', 'osmanthus', 'ginkgo', 'snow']);

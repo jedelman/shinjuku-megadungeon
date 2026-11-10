@@ -54,7 +54,9 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 - **Don't recreate other games.** MegaMan Legends lends a shape (a town above, ruins below, PS1 3D,
   a chase camera), never its characters, art or names. The Exit 8 owns "looping corridor, spot the
   anomaly". This game is a real corridor that doesn't loop; it only feels like it does.
-- The 1995 sarin attack is never content.
+- The 1995 sarin attack is never content. Because the time warp drops you into a date's night in this underground,
+  `SOMBRE` in `src/sky.js` lists nights that are never drawn or choosable: the sarin attack, the 1923 earthquake, the
+  1944–45 air raids on Tokyo, 11 March 2011. Add to it when in doubt; never remove a date.
 - If the shoulder-checking man (ぶつかりおじさん) ever appears, it's real gendered harassment: the player
   beats it. It's never a joke at the player's expense.
 

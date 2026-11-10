@@ -227,6 +227,12 @@ warp in game explanation. A little house of leaves y. But cute!"
 - **The arrival line:** "You step into the night of 28 January 2077. It's snowing indoors, a little."
 - **The idea:** it's the House of Leaves idea, a place bigger inside than out, made cute. The corridor is real; the
   night inside it isn't.
+- **Nights we never step into** (`SOMBRE`): they're never drawn and can't be chosen.
+  - 20 March 1995: the sarin attack on these very lines. It's never content.
+  - The 1923 Great Kantō earthquake.
+  - The air raids on Tokyo, from 24 November 1944 to the surrender.
+  - 11 March 2011.
+  A day either side of each. Whether to exclude more (the war years as a whole) is Jason's call.
 - **Rewards:** the deepest patch's talker pays too (two stamps for listening), since the deepest patch in Shinjuku is
   often the commuter.
 
