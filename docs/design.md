@@ -26,6 +26,24 @@ links, are in `claude-memory/conversations/2026-11-10-tokyo-megadungeon.md`.
 - **Dream of the Earth links here.** A shrine in Dream links to this page. It needs a change in
   `jedelman/dream-of-the-earth` once this game has a public URL.
 
+## The avatar (Jason, 2026-11-10)
+
+A **30 cm kitten with a backpack and a magic wand.** Jason: "Gives us lots of room to scale, so we can
+have big dramatic bossfights."
+
+- At kitten height the station reads about **six times bigger**: a 3 m concourse is a cathedral, people are
+  giants, and a ticket gate is a castle wall. The camera sits low and looks up.
+- The **backpack** carries lost property, which is useless in the dungeon but goes back to its owners. The
+  **wand** floats at the shoulder (paws don't hold wands); its star glows through the fog. It's the
+  obvious seat for abilities later.
+- A kitten fits where people don't: collision radius 0.12 m. Under gate flaps, between pillar and wall.
+  That's a mechanic waiting to happen.
+- Speeds: a 2.4 m/s trot, 6.5 m/s zoomies, and stairs taken at a bound.
+- **Boss scale, proposals only:** the station's floor-scrubbing machine on its night round, a lost-umbrella
+  colossus, and the shoulder-checking man, whom the kitten
+  beats (see the content rules). There's also kira's joke, "first boss: an exit sign that leads back to the
+  platform you just left". As a boss that lies, it works. As a looping corridor, it's The Exit 8's, so not that.
+
 ## The rest of the system: three tiers of fidelity
 
 The whole Tokyo network can't come from one dataset, so fidelity follows the data:

@@ -1,6 +1,8 @@
-// Static site on Cloudflare Workers (assets only). Workers Builds: build `npm run build`, deploy `npx wrangler deploy`.
+// Static site on Cloudflare Workers (assets only), deployed by Workers Builds on every push to main.
+// `build.command` makes `wrangler deploy` build first, so a blank build command in the dashboard still works.
 {
   "name": "shinjuku-megadungeon",
   "compatibility_date": "2026-11-01",
+  "build": { "command": "npm run build" },
   "assets": { "directory": "./dist" }
 }

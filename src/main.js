@@ -4,11 +4,13 @@ import { World, FH, CH } from './world.js';
 import { FloorNav, floorKey, distancesTo, nearestNode } from './nav.js';
 import { Input } from './input.js';
 import { LEVELS } from './levels.js';
+import { makeKitten } from './kitten.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 
 const floorName = (o) => (o < 0 ? `B${-o}F` : o === 0 ? 'Street' : `${o}F`);
+const RADIUS = 0.12; // a kitten fits through gaps people don't
 const KIND_NAME = { 4: 'Lift', 5: 'Escalator', 6: 'Stairs' };
 const COLD = { fog: new THREE.Color(0x1b2430), range: new THREE.Vector2(1, 14) };
 const WARM = { fog: shared.uFog.value.clone(), range: shared.uFogRange.value.clone() };
@@ -49,30 +51,10 @@ const nav = (o) => {
 const canvas = $('c');
 const ps1 = new PS1Renderer(canvas);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(62, 16 / 9, 0.1, 80);
+const camera = new THREE.PerspectiveCamera(68, 16 / 9, 0.03, 80);
 
-function figure() {
-  const g = new THREE.Group();
-  const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
-  white.needsUpdate = true;
-  const part = (geo, color, y, sx = 1, sy = 1, sz = 1) => {
-    const n = geo.attributes.position.count;
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(new Array(n * 3).fill(1), 3));
-    const m = new THREE.Mesh(geo, makeMaterial(white, { tint: color }));
-    m.position.y = y; m.scale.set(sx, sy, sz);
-    g.add(m);
-    return m;
-  };
-  part(new THREE.ConeGeometry(0.34, 0.8, 7), 0xe9c43b, 0.55);          // raincoat
-  part(new THREE.SphereGeometry(0.17, 7, 5), 0xe8caa8, 1.03);          // face
-  const hood = part(new THREE.SphereGeometry(0.21, 7, 5, Math.PI * 0.15, Math.PI * 1.7, 0, Math.PI * 0.62), 0xe9c43b, 1.06);
-  hood.rotation.y = Math.PI;
-  part(new THREE.BoxGeometry(0.12, 0.18, 0.14), 0x3b3a3f, 0.09).position.x = -0.1;  // boots
-  part(new THREE.BoxGeometry(0.12, 0.18, 0.14), 0x3b3a3f, 0.09).position.x = 0.1;
-  return g;
-}
-const kid = figure();
-scene.add(kid);
+const kitten = makeKitten();
+scene.add(kitten.root);
 
 // goal marker: a soft column of light at the gate
 const beacon = new THREE.Mesh(
@@ -85,8 +67,8 @@ scene.add(beacon);
 // ---- state
 const input = new Input(canvas);
 const S = {
-  state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.42, head: 0, phase: 0,
-  ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0,
+  state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
+  ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0, speed: 0,
 };
 
 function spawn() {
@@ -137,7 +119,7 @@ function startRide(e) {
   let len = 0;
   const cum = [0];
   for (let i = 1; i < P.length; i++) { len += P[i].distanceTo(P[i - 1]); cum.push(len); }
-  const speed = c.t === 5 ? 1.8 : c.t === 4 ? 0 : 2.4;
+  const speed = c.t === 5 ? 1.8 : c.t === 4 ? 0 : 3; // kittens bound up stairs
   S.ride = { P, cum, len, t: 0, dur: c.t === 4 ? 3.2 : Math.max(1.2, len / speed), to: e.to, kind: c.t, from: S.o };
   showFloors();
 }
@@ -157,7 +139,7 @@ function endRide() {
 // ---- loop
 let last = performance.now(), acc = 0, frames = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   frames++; acc += dt;
   if (acc > 0.5) { S.fps = Math.round(frames / acc); frames = 0; acc = 0; }
@@ -168,10 +150,10 @@ function frame(now) {
   } else {
     if (input.restart) spawn();
     S.yaw -= input.look[0];
-    S.pitch = Math.max(0.12, Math.min(1.0, S.pitch + input.look[1]));
+    S.pitch = Math.max(0.05, Math.min(1.0, S.pitch + input.look[1]));
     update(dt);
   }
-  draw(now / 1000);
+  draw(now / 1000, dt);
   input.endFrame();
   requestAnimationFrame(frame);
 }
@@ -204,18 +186,19 @@ function update(dt) {
   const [mx, my] = input.move;
   const fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw);
   const vx = (-fz * mx + fx * my), vz = (fx * mx + fz * my);
-  const speed = input.run ? 6.2 : 3.2;
+  const speed = input.run ? 6.5 : 2.4;   // a trot, and zoomies
   if (Math.hypot(vx, vz) > 0.05) {
     if (S.t0 === null) S.t0 = performance.now();
     const n = nav(S.o);
     let nx, nz;
     if (S.outside) { nx = S.x + vx * speed * dt * 0.35; nz = S.z + vz * speed * dt * 0.35; } // cold, slow, nowhere to go
-    else [nx, nz] = n.move(S.x, S.z, vx * speed * dt, vz * speed * dt, 0.3);
+    else [nx, nz] = n.move(S.x, S.z, vx * speed * dt, vz * speed * dt, RADIUS);
     S.walked += Math.hypot(nx - S.x, nz - S.z);
     S.x = nx; S.z = nz;
     S.head = Math.atan2(vx, vz);
-    S.phase += dt * speed * 3.2;
-  }
+    S.phase += dt * (5 + speed * 2.2);
+    S.speed = speed;
+  } else S.speed = 0;
   if (S.outside) {
     // you can only go back the way you came: the street isn't part of the dungeon
     const e = nearestEnd();
@@ -247,26 +230,36 @@ function finish() {
   void n;
 }
 
-function draw(time) {
+function draw(time, dt) {
   const baseY = S.ride ? S.rideY : S.o * FH;
-  kid.position.set(S.x, baseY + Math.abs(Math.sin(S.phase)) * 0.05, S.z);
-  kid.rotation.y = S.head;
-  kid.rotation.z = Math.sin(S.phase) * 0.06;
+  kitten.root.position.set(S.x, baseY, S.z);
+  kitten.root.rotation.y = S.head;
+  kitten.animate(dt, S.phase, S.ride ? (S.ride.kind === 6 ? 2 : 0) : S.speed);
   beacon.material.opacity = 0.25 + 0.12 * Math.sin(time * 2.2);
 
   // camera: behind and above, pulled in by walls, kept under the ceiling
-  const target = new THREE.Vector3(S.x, baseY + 1.15, S.z);
-  const d0 = 4.4;
+  // camera: low and close, so the station towers; aim a little above the kitten so the world fills the frame
+  const target = new THREE.Vector3(S.x, baseY + 0.22, S.z);
+  const d0 = 1.5;
   const dx = Math.sin(S.yaw), dz = Math.cos(S.yaw);
   const want = Math.cos(S.pitch) * d0;
   let dh = want;
-  if (!S.ride && !S.outside) dh = Math.min(dh, nav(S.o).ray(S.x, S.z, dx, dz, dh) - 0.25);
-  dh = Math.max(0.6, dh);
-  // pulled in by a wall: keep the angle and come down with it, rather than looking straight down
+  if (!S.ride && !S.outside) dh = Math.min(dh, nav(S.o).ray(S.x, S.z, dx, dz, dh) - 0.15);
+  dh = Math.max(0.35, dh);
   let cy = target.y + Math.sin(S.pitch) * d0 * Math.max(0.3, dh / want);
   if (!S.outside) cy = Math.min(cy, (S.ride ? Math.max(S.o, S.ride.to) : S.o) * FH + CH - 0.2);
   camera.position.set(S.x + dx * dh, cy, S.z + dz * dh);
-  camera.lookAt(target);
+  camera.lookAt(target.x - dx * 0.6, target.y + 0.32, target.z - dz * 0.6);
+
+  // draw only chunks the fog hasn't swallowed
+  const reach = shared.uFogRange.value.y + 26;
+  for (const g of world.groups.values()) {
+    if (!g.parent) continue;
+    for (const m of g.children) {
+      const b = m.userData.cull;
+      if (b) m.visible = camera.position.distanceTo(b.center) - b.radius < reach;
+    }
+  }
 
   // fog: fluorescent haze below ground, cold dark outside
   const env = S.outside ? COLD : WARM;

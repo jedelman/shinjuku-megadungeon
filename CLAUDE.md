@@ -73,4 +73,11 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 
 - Commits are authored by Claude through the cloud session's global git config (signed). Don't set a
   repo-local identity.
-- Merge policy: **not set yet.** Until Jason says otherwise, work on a branch and open a draft PR; Jason merges.
+- **Merge authority (Jason, 2026-11-10): "Merge authority: yes. Go nuts."** "PR: no need [to watch]. Like
+  I said, go nuts." Open a PR per change and merge it yourself once tests and the smoke run pass. Don't wait
+  for review. The content and licence rules above still hold.
+- **Deploy:** Cloudflare Workers Builds, wired by Jason 2026-11-10. Every push to `main` deploys to
+  **https://shinjuku-megadungeon.jason-edelman.org**. `wrangler.jsonc` has `build.command`, so `wrangler deploy`
+  builds first even if the dashboard's build command is blank. Node is pinned by `.node-version`. After a merge,
+  check the live site serves the new build (`curl` the page and `/data/shinjuku.json`). Build logs are only on
+  the Cloudflare dashboard.

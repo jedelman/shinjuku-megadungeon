@@ -37,6 +37,31 @@ class Builder {
   }
 }
 
+// Same API as Builder, but splits geometry into 32 m chunks so the renderer can cull by frustum and by fog
+// distance. A floor is ~800 m across and fog hides everything past ~38 m, so most of it never draws.
+export const CHUNK = 32;
+class ChunkBuilder {
+  constructor() { this.chunks = new Map(); }
+  at(x, z) {
+    const k = Math.floor(x / CHUNK) + ',' + Math.floor(z / CHUNK);
+    if (!this.chunks.has(k)) this.chunks.set(k, new Builder());
+    return this.chunks.get(k);
+  }
+  tri(a, b, c, ...rest) { this.at((a[0] + b[0] + c[0]) / 3, (a[2] + b[2] + c[2]) / 3).tri(a, b, c, ...rest); }
+  quad(a, b, c, d, ...rest) { this.at((a[0] + c[0]) / 2, (a[2] + c[2]) / 2).quad(a, b, c, d, ...rest); }
+  meshes(mat) {
+    const out = [];
+    for (const b of this.chunks.values()) {
+      const m = b.mesh(mat);
+      if (!m) continue;
+      m.frustumCulled = true;
+      m.userData.cull = m.geometry.boundingSphere;
+      out.push(m);
+    }
+    return out;
+  }
+}
+
 const rgb = (hex, k = 1) => { const c = new THREE.Color(hex); return [c.r * k, c.g * k, c.b * k]; };
 
 // earcut, then split long triangles: affine texturing needs small polygons (the PS1 did this too)
@@ -86,13 +111,16 @@ export class World {
     const y = Number(key) * FH;
     const outdoor = (f.outdoor || []).map((p) => p[0]);
 
-    const fl = new Builder(), ce = new Builder();
+    const fl = new ChunkBuilder(), ce = new ChunkBuilder();
     const white = [1, 1, 1];
+    const P = (v, h) => [v.x, h, v.y];
+    const U = (v, s) => [v.x / s, v.y / s];
     for (const poly of f.walk) {
-      for (const [a, b, c] of triangles(poly)) {
-        const P = (v, h) => [v.x, h, v.y];
-        const U = (v, s) => [v.x / s, v.y / s];
+      // the floor is seen from kitten height, so it gets smaller triangles than the ceiling
+      for (const [a, b, c] of triangles(poly, 1.5)) {
         fl.tri(P(a, y), P(b, y), P(c, y), U(a, 1.2), U(b, 1.2), U(c, 1.2), white);
+      }
+      for (const [a, b, c] of triangles(poly, 3)) {
         const cx = (a.x + b.x + c.x) / 3, cz = (a.y + b.y + c.y) / 3;
         if (!outdoor.some((r) => pointInRing(cx, cz, r))) {
           ce.tri(P(a, y + CH), P(c, y + CH), P(b, y + CH), U(a, 3.6), U(c, 3.6), U(b, 3.6), white);
@@ -100,7 +128,7 @@ export class World {
       }
     }
 
-    const wl = new Builder(), gl = new Builder();
+    const wl = new ChunkBuilder(), gl = new ChunkBuilder();
     for (const [x1, z1, x2, z2, kind] of f.walls) {
       if (kind === 'col') continue;
       const len = Math.hypot(x2 - x1, z2 - z1);
@@ -140,7 +168,7 @@ export class World {
     }
 
     // stairs, escalators and lifts that start or end on this floor
-    const st = new Builder();
+    const st = new ChunkBuilder();
     const nodes = this.data.nodes;
     for (const c of this.data.conns) {
       const oa = nodes[c.a][2], ob = nodes[c.b][2];
@@ -178,7 +206,7 @@ export class World {
     }
 
     // signs: exit codes (yellow) and named gates (green), hung below the ceiling
-    const sg = new Builder();
+    const sg = new ChunkBuilder();
     const hang = (x, z, key2, wdt, face) => {
       const r = this.atlas.uv.get(key2);
       if (!r) return;
@@ -199,8 +227,7 @@ export class World {
     });
 
     for (const [b, m] of [[fl, 'floor'], [ce, 'ceil'], [wl, 'wall'], [gl, 'glass'], [st, 'step'], [sg, 'sign']]) {
-      const mesh = b.mesh(this.mats[m]);
-      if (mesh) group.add(mesh);
+      for (const mesh of b.meshes(this.mats[m])) group.add(mesh);
     }
     return group;
   }
