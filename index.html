@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#0e1012">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon-192.png">
   <title>Shinjuku Megadungeon</title>
   <link rel="stylesheet" href="/src/style.css">
 </head>
@@ -18,9 +23,13 @@
     <p class="brief">You are a kitten, 30 cm tall, with a backpack and a magic wand.<br>
       Level 0 · Seibu Shinjuku B2 → 京王新線口<br>It's cold outside. Get to the Keio New Line gate without going up to the street.</p>
     <p class="start">press any key · tap · Ⓐ</p>
-    <p class="controls">
+    <p class="controls keys">
       <span class="k">WASD / stick</span> walk · <span class="k">Shift / Ⓑ</span> zoomies · <span class="k">drag / right stick / Q C</span> look ·
       <span class="k">E / Ⓐ</span> stairs, escalators, lifts · <span class="k">R / Start</span> restart
+    </p>
+    <p class="controls touch">
+      <span class="k">left thumb</span> walk (push to the edge for zoomies) · <span class="k">right thumb</span> look ·
+      <span class="k">▲▼</span> stairs, escalators, lifts
     </p>
     <p class="credit">出典：国土交通省 高精度測位社会プロジェクト ·
       「新宿駅周辺屋内地図データ」（国土交通省）（<a href="https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2" target="_blank" rel="noopener">geospatial.jp</a>）を加工して作成</p>
@@ -33,6 +42,7 @@
     <div id="cold" hidden>❄&#xFE0E; outside · it's cold · go back down</div>
     <div id="prompt"></div>
     <button id="act" hidden>▲▼</button>
+    <button id="fs" hidden aria-label="Full screen">⛶</button>
     <div id="fps"></div>
   </section>
 

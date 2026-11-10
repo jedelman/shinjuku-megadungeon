@@ -88,16 +88,16 @@ export class World {
     this.groups = new Map();
     this.mats = {
       floor: makeMaterial(floorTex(), { side: THREE.DoubleSide }),
-      wall: makeMaterial(wallTex(), { side: THREE.DoubleSide }),
-      glass: makeMaterial(glassTex(), { side: THREE.DoubleSide, glow: 1 }),
+      wall: makeMaterial(wallTex(), { side: THREE.DoubleSide, fade: true }),
+      glass: makeMaterial(glassTex(), { side: THREE.DoubleSide, glow: 1, fade: true }),
       ceil: makeMaterial(ceilTex(), { side: THREE.DoubleSide, glow: 0.6 }),
-      step: makeMaterial(stepTex(), { side: THREE.DoubleSide }),
+      step: makeMaterial(stepTex(), { side: THREE.DoubleSide, fade: true }),
     };
     const labels = [];
     data.exits.forEach((e, i) => labels.push({ key: 'x' + i, text: e.n, closed: e.closed }));
     data.gates.forEach((g, i) => { if (g.n) labels.push({ key: 'g' + i, text: g.n.length > 6 ? g.n.slice(0, 6) : g.n, gate: true }); });
     this.atlas = signAtlas(labels);
-    this.mats.sign = makeMaterial(this.atlas.tex, { side: THREE.DoubleSide, glow: 1 });
+    this.mats.sign = makeMaterial(this.atlas.tex, { side: THREE.DoubleSide, glow: 1, fade: true });
   }
 
   floor(o) {

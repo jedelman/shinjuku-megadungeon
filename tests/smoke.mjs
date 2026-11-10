@@ -37,6 +37,36 @@ await page.evaluate(() => { const S = window.__game.S; S.head = S.yaw; S.pitch =
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${out}/kitten-portrait.png` });
 
+// cornered: back the kitten against a real wall so the camera sits behind it; the wall must go see-through
+async function cornered(name, kindWanted, x0, z0, o) {
+  await page.goto(base + `?play&x=${x0}&z=${z0}&o=${o}`);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+  const info = await page.evaluate(([kind, x0, z0, o]) => {
+    const g = window.__game, f = g.data.floors[o.toFixed(1)], n = g.nav(o);
+    let best = null, bd = 1e9;
+    for (const [x1, z1, x2, z2, k] of f.walls) {
+      const L = Math.hypot(x2 - x1, z2 - z1);
+      if (k !== kind || L < 1.5) continue;
+      const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, d = Math.hypot(mx - x0, mz - z0);
+      if (d >= bd) continue;
+      const nx = -(z2 - z1) / L, nz = (x2 - x1) / L;
+      for (const s of [1, -1]) {
+        const px = mx + s * nx * 0.35, pz = mz + s * nz * 0.35;
+        if (n.inside(px, pz) && !n.inside(mx - s * nx * 0.6, mz - s * nz * 0.6)) { bd = d; best = { px, pz, nx: s * nx, nz: s * nz }; }
+      }
+    }
+    if (!best) return null;
+    const S = g.S;
+    S.x = best.px; S.z = best.pz; S.yaw = Math.atan2(-best.nx, -best.nz); S.head = S.yaw; S.pitch = 0.3;
+    return best;
+  }, [kindWanted, x0, z0, o]);
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: `${out}/${name}.png` });
+  console.log(name, info ? 'placed' : 'no wall found');
+}
+await cornered('cornered-shopfront', 'shop', 178.61, -261.56, -2);
+await cornered('cornered-wall', 'room', -59.16, -2.36, -1);
+
 // walk forward for 3 s and confirm we moved and stayed inside
 await page.goto(base + '?play');
 await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');

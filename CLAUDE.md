@@ -74,6 +74,16 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   a React renderer and adds no animation (drei's `useAnimations` wraps this same mixer). If React is ever
   wanted for other reasons, this module mounts as a `<primitive>` unchanged.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
+- `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
+  thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered
+  the canvas, which was the only thing listening).
+- **Camera: no pull-in.** Jason (2026-11-10): "It's fine if the camera clips through a wall as long as we make
+  the wall translucent, that way corners are still playable. Getting cornered in Bloodborne sucks." The camera
+  keeps its distance; walls, glass, stairs and signs between it and the kitten turn to screen-door (mesh)
+  transparency in the PS1 shader (`solidity()` in `ps1.js`, materials with `fade: true`). Floors and
+  ceilings never fade.
+- Fullscreen is only ever requested inside a tap/click handler (the title card, the ⛶ button), never from the
+  render loop. `public/manifest.webmanifest` makes add-to-home-screen launch fullscreen and landscape.
 - Floors are ordinals only; `FH` (5 m) and `CH` (3.1 m) in `world.js` are design choices, not data.
 
 ## Git
