@@ -415,6 +415,41 @@ for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sa
   }
 }
 
+// Trains and tanuki on the Marunouchi line's platform at Shinjuku (B2), and the crowd
+{
+  await page.goto(base + '?level=0&play&day=2026-11-10');
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.trains && window.__game.rail);
+  const v = await page.evaluate(() => {
+    const g = window.__game, pl = g.rail.platforms.find((x) => x.name.includes('新宿駅'));
+    const tk = pl.tracks[0], tr = g.rail.tracks[tk.track], nav = g.nav(pl.o);
+    // from the track, step toward the platform until there's floor, then a little more
+    let d = 0;
+    const at = (dd) => [tr.p[0] + tr.u[0] * (tr.stop + 12) - tr.n[0] * dd, tr.p[1] + tr.u[1] * (tr.stop + 12) - tr.n[1] * dd];   // past the stop, looking back at it
+    while (d < 8 && !nav.inside(...at(d))) d += 0.2;
+    const [x, z] = at(d + 1.2);
+    const fx = tr.n[0] * 0.55 - tr.u[0] * 0.83, fz = tr.n[1] * 0.55 - tr.u[1] * 0.83;
+    return { ti: tk.track, x, z, o: pl.o, yaw: Math.atan2(-fx, -fz), line: tr.line };
+  });
+  await page.goto(base + `?level=0&play&day=2026-11-10&x=${v.x}&z=${v.z}&o=${v.o}&yaw=${v.yaw}`);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.trains);
+  await page.evaluate(() => { window.__game.store.data.notes = []; });
+  await page.addStyleTag({ content: '#say{display:none!important}' });
+  await page.evaluate((i) => window.__game.trains.force(i, false), v.ti);
+  await page.waitForTimeout(3000);
+  const t1 = await page.evaluate((i) => ({ st: window.__game.trains.state(i), shown: window.__game.trains.built.get(i)?.train.g.visible, crowd: window.__game.crowd.active.length, fps: window.__game.S.fps }), v.ti);
+  console.log('train', v.line, JSON.stringify(t1));
+  if (!t1.st || t1.st.phase !== 'stop' || !t1.shown) errors.push(`no train at the platform (${JSON.stringify(t1)})`);
+  if (t1.crowd < 8) errors.push(`the station is nearly empty (${t1.crowd} people)`);
+  await page.screenshot({ path: `${out}/rail-train.png` });
+  await page.waitForTimeout(31000);
+  await page.evaluate((i) => window.__game.trains.force(i, true), v.ti);
+  await page.waitForTimeout(2500);
+  const t2 = await page.evaluate((i) => ({ shown: window.__game.trains.built.get(i)?.parade.g.visible, notes: [...window.__game.store.data.notes] }), v.ti);
+  console.log('tanuki', JSON.stringify(t2));
+  if (!t2.shown || !t2.notes.includes('tanuki')) errors.push(`no tanuki, or no field note for them (${JSON.stringify(t2)})`);
+  await page.screenshot({ path: `${out}/rail-tanuki.png` });
+}
+
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

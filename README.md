@@ -48,6 +48,10 @@ The station has its animals, real ones from Tokyo:
 
 Meeting each one writes a field note, with facts from real sources.
 
+Trains run on the real platforms (from OpenStreetMap), stop behind the platform doors, and leave. Sometimes the train
+is a lot of tanuki pretending, stacked three high, after the old phantom-train tales. Goofy, blocky commuters shuffle
+through the concourses and wait on the platforms, and thin out at midnight inside the patches.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
@@ -71,7 +75,8 @@ Map data: 出典：国土交通省 高精度測位社会プロジェクト.
 Astra's route also uses 「歩行空間ネットワークデータ（都営地下鉄大江戸線 都庁前駅）」 and 「歩行空間ネットワークデータ（東京都渋谷区・渋谷駅、千駄ヶ谷駅周辺／東京都新宿区・新宿駅周辺）」
 （国土交通省）（https://ckan.hokonavi.go.jp）を加工して作成, Public Data License 1.0, and OpenStreetMap data,
 © OpenStreetMap contributors, under the ODbL. Its combined data file (`public/data/shinjuku-astra.json`) is
-therefore under the ODbL 1.0.
+therefore under the ODbL 1.0, as are the platform and track files (`public/data/*-rail.json`), made from OpenStreetMap
+alone.
 Patch structure after Rise Up Comus (Joshy Mcroo), "The Elemental Level of Megadungeon Construction" (2026); the
 underworld layout after his *His Majesty the Worm*, Appendix E. Planet positions: our own implementation of Paul
 Schlyter's method, tested against astronomy-engine (MIT, development only).

@@ -280,6 +280,59 @@ real urban animals in Japan.
   - Cockroaches.
   - The London Underground mosquito. Not cute, and a 2025 *Science* study found it didn't evolve in the Tube after all.
 
+## Trains, tanuki and the crowd (2026-11-10)
+
+Jason: "we should have trains moving across platforms and people shuffling about, it's kind of eerie with no one in
+here. They can be katamari level of detail - goofy is fine." Then: "sometimes it's a train, sometimes it's a crowd of
+tanuki."
+
+**Platforms and tracks come from OpenStreetMap.** MLIT's indoor maps don't mark them (its walkway codes cover stairs,
+lifts and escalators). The pipeline:
+1. `tools/filter_rail.py` keeps OSM platforms and track centrelines from station-sized main-API boxes, giving
+   `data/osm/rail-*.osm.gz` (ODbL).
+2. `tools/build_rail.py` writes `public/data/{shinjuku,tokyo}-rail.json`. That's an ODbL database of its own, kept out
+   of the MLIT-only files.
+
+**What `build_rail.py` checks:**
+- **The floor.** A platform goes on the MLIT floor it overlaps most, within one of OSM's level (stacked floors fool 2D
+  overlap), with at least half its area on that floor.
+- **The edge.** OSM and MLIT disagree by a metre or three, so each track is snapped to MLIT's real platform edge. That's
+  the strongest long wall line along that side; kiosks on the platform are holes, so a ray across stops short. The
+  track goes 1.7 m beyond the edge, nudged out up to 1.5 m more until the train never crosses walkable floor.
+- **Drops.** A side is dropped where the edge can't be found or the line can't be placed. Shinjuku keeps 8 platforms
+  and 11 tracks (Marunouchi, Ōedo, Toei Shinjuku). Tokyo keeps 2 platforms and 2 tracks (Marunouchi at Tokyo, Chiyoda
+  at Ōtemachi). Fewer trains in the right places beats trains through the floor.
+
+**The world:**
+- Walls in the gap between a platform and its track become platform doors, drawn as frames: the glass is clear, so a
+  30 cm kitten can watch the trains through it. They keep their collision.
+- Beyond them: the drop, the track bed, rails, a ceiling, and a tunnel wall where no platform faces the track.
+
+**Trains** (`src/trains.js`):
+- **Timetable.** `timetable()` is pure: a train every 75–165 s per track, seeded by tonight's chart. It brakes in,
+  stops 22 s with its doors open, and accelerates out, appearing and vanishing in the tunnel past the fog.
+- **Looks.** Katamari-level: silver cars with the line's colour as a stripe. Colours echo real wayfinding; no marks or
+  logos. Each car is one merged mesh plus sliding door leaves.
+
+**Tanuki:**
+- **How often.** About one arrival in six is tanuki instead, decided by tonight's chart.
+- **What you see.** They stack three high in two files to be train-sized. That's the disguise: Meiji-era folk tales of
+  tanuki disguised as trains, 偽汽車, including one from Kameari on the Jōban line. The lead tanuki wears a leaf and
+  carries a lantern for a headlight. They stop, look round at you, and go.
+- **The field note** (sources in code): tanuki live in the 23 wards and walk the tracks at night (DIME, citing NHK);
+  the 偽汽車 tales (yokai.jp), "in the stories, the real train usually won".
+
+**The crowd** (`src/crowd.js`):
+- **Walking.** About 24 goofy, blocky commuters walk the real walking network on the kitten's floor. They fade in and
+  out of the fog and sidestep the kitten. They turn see-through between the camera and the kitten, like walls.
+- **Waiting.** On platforms they wait facing the track, phone in hand, and board when a train stands with its doors
+  open.
+- **Patches.** Inside a patch (another night, at midnight) the station nearly empties.
+- **Cost.** Each commuter is five meshes: a merged body plus swinging legs and arms (`src/blocks.js`).
+
+**Not yet:** alighting passengers, sound (an original melody per station, never the real ones), and trains between
+stations (step 4).
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -329,6 +382,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **3c. Done 2026-11-10:** the underworld: tonight's horoscope deals a tarot spread onto the patches by real depth; wand portals.
 - **3d. Done 2026-11-10:** a chart makes the patch (addresses, replay, the time warp); the kitten's new proportions.
 - **3e. Done 2026-11-10:** critters: pigeons, black rats, geckos, pill bugs, swallows (field notes with sources).
+- **3f. Done 2026-11-10:** trains on OSM platforms (sometimes tanuki), platform doors, and a crowd.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 

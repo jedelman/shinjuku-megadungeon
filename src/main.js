@@ -8,7 +8,9 @@ import { makeKitten } from './kitten.js';
 import { People, Store, places } from './people.js';
 import { Quilt, parseAddress } from './patches.js';
 import { Critters, SPECIES } from './critters.js';
-import { tonight, describe, longDate } from './sky.js';
+import { Trains } from './trains.js';
+import { Crowd } from './crowd.js';
+import { tonight, describe, longDate, skySeed } from './sky.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -26,7 +28,9 @@ const beacon = new THREE.Mesh(
 );
 
 // ---- the level: its station's data, the goal gate, the route there, the floor connectors
-let data, world, level, goal, route;
+let data, world, level, goal, route, rail;
+// platforms and tracks from OpenStreetMap (ODbL), per station frame; MLIT doesn't map them
+const RAIL = { shinjuku: 'shinjuku-rail', 'shinjuku-astra': 'shinjuku-rail', tokyo: 'tokyo-rail' };
 const ends = new Map();
 const navs = new Map();
 const cache = new Map();
@@ -39,9 +43,12 @@ const nav = (o) => {
 async function loadLevel(i) {
   const L = LEVELS[i];
   if (!cache.has(L.station)) cache.set(L.station, fetch(`data/${L.station}.json`).then((r) => r.json()));
+  const railName = RAIL[L.station];
+  if (railName && !cache.has(railName)) cache.set(railName, fetch(`data/${railName}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
   const d = await cache.get(L.station);
+  const rl = railName ? await cache.get(railName) : null;
   if (world) for (const g of world.groups.values()) if (g.parent) g.parent.remove(g);
-  if (!world || data !== d) { data = d; world = new World(d); navs.clear(); }
+  if (!world || data !== d) { data = d; rail = rl; world = new World(d, rl); navs.clear(); }
   level = L;
   if (L.goal.at) goal = { x: L.goal.at.x, z: L.goal.at.z, o: L.goal.o };   // a place, not a named gate
   else {
@@ -84,7 +91,7 @@ scene.add(beacon);
 const input = new Input(canvas);
 const store = new Store((() => { try { return localStorage; } catch { return null; } })());
 const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
-let people = null, quilt = null, critters = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
+let people = null, quilt = null, critters = null, trains = null, crowd = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
   ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0, speed: 0,
@@ -110,6 +117,11 @@ function spawn() {
   // the small animals of the station, where their lives would put them
   critters?.dispose();
   critters = new Critters(scene, data, level, route, sky, store, quilt.patches, nav);
+  // trains on the platforms (sometimes tanuki), and people shuffling about
+  trains?.dispose();
+  trains = new Trains(scene, rail, level, sky, store);
+  crowd?.dispose();
+  crowd = new Crowd(scene, data, rail, nav, trains, skySeed(sky, `${level.id}|crowd`));
   visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
@@ -303,7 +315,7 @@ function finish() {
     (people.helped ? `<br>You helped ${people.helped} ${people.helped > 1 ? 'people' : 'person'} find their way.` : '') +
     (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '') +
     `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.` +
-    `<br>Field notes: ${(store.data.notes || []).length} of ${Object.keys(SPECIES).length} creatures.` +
+    `<br>Field notes: ${(store.data.notes || []).length} of ${Object.keys(SPECIES).length + 1} creatures.` +
     (quilt.patches.length ? `<br><a href="?level=${levelIndex}&amp;play&amp;patches=${encodeURIComponent(quilt.addresses().join(','))}">Replay tonight's patches</a>: ${quilt.addresses().map(esc).join(' · ')}` : '');
   void n;
 }
@@ -348,7 +360,11 @@ function draw(time, dt) {
 
   people?.update(dt, S, time);
   quilt?.update(dt, S, time);
-  if (S.state === 'play' && !S.done) { const met = critters?.update(dt, S, time) || []; if (met.length) say(met); }
+  if (S.state === 'play' && !S.done) {
+    const met = [...(critters?.update(dt, S, time) || []), ...(trains?.update(dt, S, time) || [])];
+    if (met.length) say(met);
+    crowd?.update(dt, S, time, !!quilt?.zone);   // inside a patch it's another night, at midnight: nearly empty
+  }
   ps1.render(scene, camera);
   hud();
 }
@@ -493,4 +509,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get crowd() { return crowd; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
