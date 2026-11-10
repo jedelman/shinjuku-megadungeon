@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0e1012">
+  <title>Shinjuku Megadungeon</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="loading">新宿 · loading the dungeon…</div>
+
+  <section id="title">
+    <h1>SHINJUKU<br>MEGADUNGEON</h1>
+    <p class="jp">新宿ダンジョン</p>
+    <p class="brief">Level 0 · Seibu Shinjuku B2 → 京王新線口<br>It's cold outside. Get to the Keio New Line gate without going up to the street.</p>
+    <p class="start">press any key · tap · Ⓐ</p>
+    <p class="controls">
+      <span class="k">WASD / stick</span> walk · <span class="k">Shift / Ⓑ</span> run · <span class="k">drag / right stick / Q C</span> look ·
+      <span class="k">E / Ⓐ</span> stairs, escalators, lifts · <span class="k">R / Start</span> restart
+    </p>
+    <p class="credit">出典：国土交通省 高精度測位社会プロジェクト ·
+      「新宿駅周辺屋内地図データ」（国土交通省）（<a href="https://www.geospatial.jp/ckan/dataset/mlit-indoor-shinjuku-r2" target="_blank" rel="noopener">geospatial.jp</a>）を加工して作成</p>
+  </section>
+
+  <section id="hud" hidden>
+    <div id="where"></div>
+    <div id="goal"></div>
+    <div id="arrow" hidden>▲</div>
+    <div id="cold" hidden>❄&#xFE0E; outside · it's cold · go back down</div>
+    <div id="prompt"></div>
+    <button id="act" hidden>▲▼</button>
+    <div id="fps"></div>
+  </section>
+
+  <section id="done" hidden>
+    <p id="done-text"></p>
+    <p class="start">E · Ⓐ · tap to walk it again</p>
+  </section>
+
+  <div id="turn">Turn your phone sideways.<br><span>横向きにしてください</span></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
