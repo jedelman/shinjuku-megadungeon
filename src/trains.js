@@ -24,7 +24,8 @@ export const TANUKI = {
 const APPROACH = 14, DWELL = 22, LEAVE = 14, RUN = 180;   // seconds, seconds, seconds, metres
 
 // Where a track's train is at time t (seconds), or null between trains. Pure.
-// Returns { k (which arrival), phase: 'in' | 'stop' | 'out', s (metres along the track from its stop), doors (0..1) }.
+// Returns { k (which arrival), phase: 'in' | 'stop' | 'out', s (metres along the track from its stop), v (its speed along
+// the track, m/s, signed like s), doors (0..1) }. The sound's Doppler shift comes from v.
 export function timetable(track, sky, levelId, index, t) {
   const r = rng(skySeed(sky, `${levelId}|track|${index}`));
   const period = 75 + Math.floor(r() * 90);                  // a train every 75–165 s
@@ -32,12 +33,18 @@ export function timetable(track, sky, levelId, index, t) {
   const dir = r() < 0.5 ? 1 : -1;
   const k = Math.floor((t + offset) / period);
   const x = (t + offset) - k * period;
-  let phase, s, doors = 0;
-  if (x < APPROACH) { phase = 'in'; const q = 1 - x / APPROACH; s = -dir * RUN * q * q; }
+  const st = run(x, dir);
+  return st && { k, ...st, tanuki: isTanuki(sky, levelId, index, k) };
+}
+
+// x seconds into an arrival: braking in from the tunnel, stopped with the doors open, pulling out
+function run(x, dir) {
+  let phase, s, v = 0, doors = 0;
+  if (x < APPROACH) { phase = 'in'; const q = 1 - x / APPROACH; s = -dir * RUN * q * q; v = (2 * dir * RUN * q) / APPROACH; }
   else if (x < APPROACH + DWELL) { phase = 'stop'; s = 0; const d = x - APPROACH; doors = Math.min(1, d / 2, (DWELL - d) / 2); }
-  else if (x < APPROACH + DWELL + LEAVE) { phase = 'out'; const q = (x - APPROACH - DWELL) / LEAVE; s = dir * RUN * q * q; }
+  else if (x < APPROACH + DWELL + LEAVE) { phase = 'out'; const q = (x - APPROACH - DWELL) / LEAVE; s = dir * RUN * q * q; v = (2 * dir * RUN * q) / LEAVE; }
   else return null;
-  return { k, phase, s, doors: Math.max(0, doors), dir, tanuki: isTanuki(sky, levelId, index, k) };
+  return { phase, s, v, doors: Math.max(0, doors), dir };
 }
 
 // one arrival in six is tanuki, decided by tonight's sky
@@ -143,6 +150,9 @@ export class Trains {
     this.forced = new Map();   // for tests: a track made to run a given arrival now
     this.built = new Map();
     this.metTanuki = false;
+    this.heard = [];      // what the sound hears this frame: each train near you, where it is and how fast it's going
+    this.dings = [];      // doors opening and closing this frame
+    this.doors = new Map();
   }
 
   dispose() { this.scene.remove(this.root); }
@@ -156,13 +166,8 @@ export class Trains {
     const f = this.forced.get(i);
     if (f) {
       const x = this.now() - f.at + (f.approach ? 0 : APPROACH);   // forced trains arrive stopped, or come in
-      if (x < APPROACH + DWELL + LEAVE) {
-        const st = { k: -1, dir: 1, tanuki: f.tanuki, phase: 'stop', s: 0, doors: 0 };
-        if (x < APPROACH) { st.phase = 'in'; const q = 1 - x / APPROACH; st.s = -RUN * q * q; }
-        else if (x < APPROACH + DWELL) { const d = x - APPROACH; st.doors = Math.max(0, Math.min(1, d / 2, (DWELL - d) / 2)); }
-        else { st.phase = 'out'; const q = (x - APPROACH - DWELL) / LEAVE; st.s = RUN * q * q; }
-        return st;
-      }
+      const st = run(x, 1);
+      if (st) return { k: -1, ...st, tanuki: f.tanuki };
       this.forced.delete(i);
     }
     return timetable(tr, this.sky, this.level.id, i, this.now());
@@ -170,10 +175,19 @@ export class Trains {
 
   update(dt, S, time) {
     const out = [];
+    this.heard = []; this.dings = [];
     this.rail.tracks.forEach((tr, i) => {
       const st = tr.o === S.o ? this.state(i) : null;
       const near = st && Math.hypot(tr.p[0] + tr.u[0] * tr.stop - S.x, tr.p[1] + tr.u[1] * tr.stop - S.z) < tr.L / 2 + 60;
       let b = this.built.get(i);
+      // the doors chime as they open and as they start to close
+      const was = this.doors.get(i) ?? 0, now = near && !st.tanuki ? st.doors : 0;
+      const mine = (tr.p[0] - S.x) * -tr.u[0] + (tr.p[1] - S.z) * -tr.u[1];        // how far along the track you are
+      const door = Math.max(tr.stop - tr.L * 0.45, Math.min(tr.stop + tr.L * 0.45, mine));
+      const at = [tr.p[0] + tr.u[0] * door, tr.p[1] + tr.u[1] * door];               // the nearest door to you
+      if (was === 0 && now > 0) this.dings.push({ kind: 'open', x: at[0], z: at[1], track: i });
+      if (was >= 1 && now < 1 && now > 0) this.dings.push({ kind: 'close', x: at[0], z: at[1], track: i });
+      this.doors.set(i, now);
       if (!near) { if (b) { b.train.g.visible = false; b.parade.g.visible = false; } return; }
       if (!b) {
         b = { train: trainModel(tr), parade: tanukiParade(tr) };
@@ -186,6 +200,10 @@ export class Trains {
       const yaw = Math.atan2(tr.u[0] * st.dir, tr.u[1] * st.dir);
       const show = Math.abs(st.s) < tr.L / 2 + 40;     // trains appear and vanish in the tunnel, past the fog
       const g = st.tanuki ? b.parade.g : b.train.g;
+      // a train is long: you hear the nearest part of it
+      const near2 = Math.max(along - tr.L * 0.45, Math.min(along + tr.L * 0.45, mine));
+      this.heard.push({ id: i, x: tr.p[0] + tr.u[0] * near2, z: tr.p[1] + tr.u[1] * near2, o: tr.o, vx: tr.u[0] * st.v, vz: tr.u[1] * st.v,
+        visible: show, tanuki: st.tanuki, moving: st.phase !== 'stop' });
       b.train.g.visible = !st.tanuki && show;
       b.parade.g.visible = st.tanuki && show;
       if (st.tanuki) {

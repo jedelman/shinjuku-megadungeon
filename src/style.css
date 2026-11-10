@@ -54,11 +54,13 @@ canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block;
   width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--sign); background: rgba(0, 0, 0, 0.45);
   color: var(--sign); font: 700 18px var(--font);
 }
-#fs {
-  pointer-events: auto; position: absolute; top: max(36px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right));
+#fs, #snd {
+  pointer-events: auto; position: absolute; top: max(36px, env(safe-area-inset-top)); right: max(62px, calc(env(safe-area-inset-right) + 48px));
   width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--dim); background: rgba(0, 0, 0, 0.45);
   color: var(--ink); font: 18px var(--font);
 }
+#snd { right: max(14px, env(safe-area-inset-right)); font-size: 16px; }
+#snd.off { color: var(--dim); text-decoration: line-through; }
 #bag { position: absolute; top: max(28px, calc(env(safe-area-inset-top) + 18px)); left: max(14px, env(safe-area-inset-left)); color: var(--sign); font-size: 12px; }
 #map { position: absolute; top: max(48px, calc(env(safe-area-inset-top) + 38px)); left: max(14px, env(safe-area-inset-left)); width: 120px; height: 120px; border: 1px solid #5c584d; image-rendering: pixelated; }
 #say {
