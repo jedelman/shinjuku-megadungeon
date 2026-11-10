@@ -337,6 +337,84 @@ for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sa
   await page.screenshot({ path: `${out}/${name}.png` });
 }
 
+// The critters: meet each species the way a player would, under the pinned night
+{
+  const url = base + `?level=0&play&day=2026-11-10&${NIGHT}`;
+  await page.goto(url);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.critters);
+  await page.evaluate(() => { window.__game.store.data.notes = []; });
+  const list = await page.evaluate(() => window.__game.critters.list.map((c) => ({ species: c.species, x: c.x, z: c.z, o: c.o, y: c.y, wall: c.wall, flock: c.flock })));
+  const n = {}; for (const c of list) n[c.species] = (n[c.species] || 0) + 1;
+  console.log('critters', JSON.stringify(n));
+  const put = (x, z, o, yaw) => page.evaluate(({ x, z, o, yaw }) => { const g = window.__game; Object.assign(g.S, { x, z, o, yaw, head: yaw + Math.PI }); }, { x, z, o, yaw });
+  const face = (fx, fz, tx, tz) => Math.atan2(-(tx - fx), -(tz - fz));   // the kitten faces yaw + π
+  const notes = () => page.evaluate(() => [...window.__game.store.data.notes]);
+  const walkable = (x, z, o) => page.evaluate(({ x, z, o }) => window.__game.nav(o).inside(x, z), { x, z, o });
+  async function standOff(c, d) {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2, x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d;
+      if (await walkable(x, z, c.o)) return { x, z };
+    }
+    return null;
+  }
+  // pigeons: zoom at a flock
+  const pg = list.find((c) => c.species === 'pigeon');
+  let at = await standOff(pg, 4);
+  await put(at.x, at.z, pg.o, face(at.x, at.z, pg.x, pg.z));
+  await page.waitForTimeout(300);
+  await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft');
+  const flew = await page.evaluate((f) => window.__game.critters.list.filter((c) => c.species === 'pigeon' && c.flock === f).some((c) => c.state === 'fly' || Math.hypot(c.x - c.home.x, c.z - c.home.z) > 1), pg.flock);
+  console.log('pigeons flew', flew, JSON.stringify(await notes()));
+  if (!flew) errors.push('the pigeons did not fly up at a zoomie');
+  // a rat: sit still nearby and wait
+  await page.waitForTimeout(1200);   // let the zoomies wear off first: a rat flees a running kitten
+  const rt = list.find((c) => c.species === 'rat');
+  at = await standOff(rt, 2.2);
+  await put(at.x, at.z, rt.o, face(at.x, at.z, rt.x, rt.z));
+  await page.waitForTimeout(9000);
+  const rat = await page.evaluate(() => {
+    const g = window.__game, rats = g.critters.list.filter((c) => c.species === 'rat' && c.o === g.S.o);
+    return rats.sort((a, b) => Math.hypot(a.x - g.S.x, a.z - g.S.z) - Math.hypot(b.x - g.S.x, b.z - g.S.z))[0]?.state;
+  });
+  console.log('rat', rat, JSON.stringify(await notes()));
+  if (rat !== 'friend') errors.push(`a rat didn't come to a still kitten (${rat})`);
+  // a gecko: walk under it
+  const gk = list.find((c) => c.species === 'gecko');
+  await put(gk.x + gk.wall.nx * 1.8, gk.z + gk.wall.nz * 1.8, gk.o, face(gk.x + gk.wall.nx * 1.8, gk.z + gk.wall.nz * 1.8, gk.x, gk.z));
+  await page.waitForTimeout(500);
+  // a pill bug: walk into it
+  const pb = list.find((c) => c.species === 'pillbug');
+  at = await standOff(pb, 0.7);
+  await put(at.x, at.z, pb.o, face(at.x, at.z, pb.x, pb.z));
+  await page.keyboard.down('KeyW'); await page.waitForTimeout(450); await page.keyboard.up('KeyW');
+  await page.waitForTimeout(300);
+  const rolled = await page.evaluate(() => window.__game.critters.list.some((c) => c.species === 'pillbug' && c.state === 'ball'));
+  console.log('pill bug rolled', rolled);
+  if (!rolled) errors.push("a pill bug didn't roll up when the kitten bumped it");
+  // a swallow's nest: stand under it
+  const sw = list.find((c) => c.species === 'swallow');
+  if (sw) { await put(sw.x + 1, sw.z, sw.o, Math.PI / 2); await page.waitForTimeout(500); }
+  const got = await notes();
+  console.log('field notes', JSON.stringify(got));
+  for (const sp of ['pigeon', 'rat', 'gecko', 'pillbug', ...(sw ? ['swallow'] : [])]) if (!got.includes(sp)) errors.push(`no field note for ${sp}`);
+  // portraits
+  for (const [name, c, dist] of [['critter-pigeons', pg, 1.6], ['critter-rat', rt, 1.1], ['critter-gecko', gk, 1.4], ['critter-pillbug', pb, 0.8], ['critter-swallow', sw, 2.2]]) {
+    if (!c) continue;
+    const p = c.wall ? { x: c.x + c.wall.nx * dist, z: c.z + c.wall.nz * dist } : await standOff(c, dist);
+    if (!p) continue;
+    // look a little past small animals on the floor, so the kitten doesn't hide them
+    const turn = name === 'critter-rat' || name === 'critter-pillbug' ? 0.55 : 0;
+    await page.goto(url + `&x=${p.x}&z=${p.z}&o=${c.o}&yaw=${face(p.x, p.z, c.x, c.z) + turn}`);
+    await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+    await page.addStyleTag({ content: '#say{display:none!important}' });
+    if (name === 'critter-gecko' || name === 'critter-swallow') await page.evaluate(() => { window.__game.S.pitch = -0.25; });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${out}/${name}.png` });
+  }
+}
+
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

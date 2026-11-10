@@ -39,6 +39,15 @@ A chart makes the patch: each patch is placed by the horoscope of its own night,
 HUD, its season's light, and cherry petals, fireflies, osmanthus, ginkgo or snow drifting down the corridor. The finish
 card links tonight's patches; `?patches=a@d,b@d` replays any.
 
+The station has its animals, real ones from Tokyo:
+- pigeons by the exits, who scatter at zoomies;
+- black rats in the deep, who come close if you sit still;
+- geckos on the walls by the lights;
+- pill bugs that roll up when you bump them;
+- swallows nesting over the patches whose night is in spring or summer.
+
+Meeting each one writes a field note, with facts from real sources.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
