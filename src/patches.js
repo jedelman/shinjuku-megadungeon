@@ -17,10 +17,10 @@
 // highest to the deepest. Patches next to each other on the table are stitched with chalk; the others the cards
 // connect are joined by portals the kitten casts with her wand.
 import * as THREE from 'three';
-import { FH } from './world.js';
+import { FH, CH } from './world.js';
 import { nearestNode, FloorNav, floorKey, MinHeap } from './nav.js';
 import { places, rng, hash, box, makePerson, label } from './people.js';
-import { tonight, skySeed } from './sky.js';
+import { tonight, skySeed, cast, randomDate, season, validDate, longDate } from './sky.js';
 import { draw, layout, title, roman } from './arcana.js';
 
 export const KERNELS = ['explore', 'talk', 'run'];
@@ -137,13 +137,11 @@ export function egress(data) {
   return out;
 }
 
-// Sew the day's patches onto the station: each heart on a real place of the kind it asks for, its rooms on other
-// real places within a short walk on the same floor, its gate on a real connector to another underground floor,
-// everything reachable from the level's route without surfacing. Patches that don't fit today are left out.
-export function sew(data, level, route, day, patches = PATCHES, { max = 4, counter = null } = {}) {
-  const sky = typeof day === 'string' ? tonight(day) : day;
-  const r = rng(skySeed(sky, `${level.id}|quilt`));
-  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// What placing patches on a level needs: its real places and connectors, which of them are usable (underground,
+// walkable, reachable from the level's route). Built once per level.
+const CTX = new WeakMap();
+function context(data, route) {
+  if (CTX.has(route)) return CTX.get(route);
   const navs = new Map();
   const walkable = (k) => {
     const o = data.nodes[k][2], key = floorKey(o);
@@ -152,7 +150,6 @@ export function sew(data, level, route, day, patches = PATCHES, { max = 4, count
   };
   // a room sits on a network node that's underground, on the walkable floor, and reachable from the route
   const ok = (k) => k >= 0 && data.nodes[k][2] < 0 && Number.isFinite(route.dist[k]) && walkable(k);
-
   const spots = places(data).filter((p) => p.o < 0);
   for (const f of data.offices) if (f.o < 0) spots.push({ key: `office@${Math.round(f.x)},${Math.round(f.z)},${f.o}`, name: 'a station office', kind: 'office', x: f.x, z: f.z, o: f.o });
   for (const s of spots) {
@@ -166,50 +163,96 @@ export function sew(data, level, route, day, patches = PATCHES, { max = 4, count
       if (ok(h) && t >= 0 && data.nodes[t][2] < 0 && Number.isFinite(route.dist[t]) && data.nodes[t][2] !== data.nodes[h][2]) ends.push({ node: h, to: data.nodes[t][2], t: c.t, conn: ci, key: `conn${ci}@${h}` });
     }
   });
+  const ctx = { data, usable, ends };
+  CTX.set(route, ctx);
+  return ctx;
+}
+
+// One patch on one night. Its own chart (cast for Tokyo at midnight on that date) alone decides where it lies, so
+// an address like `the-last-shutter@1927-12-30` always names the same patch in a station: dungeons you can share,
+// replay and test. Jason (2026-11-10): "A chart makes the patch!" Returns null if this night it doesn't fit.
+export function placePatch(ctx, P, date, station) {
+  const { data, usable, ends } = ctx;
+  const chart = cast(date);
+  const r = rng(skySeed(chart, `${station}|${P.id}`));
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const fits = (s, at) => !at || at === 'any' || s.kind === at;
   const at = (k) => ({ x: data.nodes[k][0], z: data.nodes[k][1], o: data.nodes[k][2], node: k });
-
-  // greedy placement can strand the last patch, so try a few seeded orders and keep the fullest quilt
-  let out = [];
-  const want = Math.min(max, patches.length);
-  for (let tries = 0; tries < 6 && out.length < want; tries++) {
-    const got = place();
-    if (got.length > out.length) out = got;
-  }
-  function place() {
-  const taken = new Set();
-  const out = [];
-  for (const P of shuffle([...patches])) {
-    if (out.length >= max) break;
-    const defs = P.rooms;
-    const hd = defs.find((d) => d.role === 'heart');
-    for (const h of shuffle(usable.filter((s) => fits(s, hd.at) && !taken.has(s.key)))) {
-      if (out.some((q) => Math.hypot(q.heart.x - h.x, q.heart.z - h.z) < APART)) continue;
-      const near = around(data, h.node, NODE * 1.4);
-      const used = [h];
-      const far = (s) => used.every((u) => Math.hypot(u.x - s.x, u.z - s.z) >= ROOMS_APART && u.node !== s.node);
-      const rooms = [];
-      let failed = false;
-      for (const d of defs) {
-        let spot;
-        if (d.role === 'heart') spot = h;
-        else if (d.role === 'gate') {
-          spot = shuffle(ends.filter((e) => data.nodes[e.node][2] === h.o && near.has(e.node) && !taken.has(e.key) && far(at(e.node))))[0];
-          if (spot) spot = { ...spot, ...at(spot.node), name: `${KIND[spot.t] || 'Stairs'} to ${floorName(spot.to)}`, kind: 'conn' };
-        } else {
-          spot = shuffle(usable.filter((s) => s.o === h.o && fits(s, d.at) && !taken.has(s.key) && (near.get(s.node) ?? Infinity) <= NODE && far(s)))[0];
-        }
-        if (!spot) { failed = true; break; }
-        used.push(spot);
-        rooms.push({ role: d.role, def: d, name: spot.name, kind: spot.kind, key: spot.key, ...at(spot.node), ...(d.role === 'gate' ? { to: spot.to, t: spot.t } : {}) });
+  const defs = P.rooms;
+  const hd = defs.find((d) => d.role === 'heart');
+  for (const h of shuffle(usable.filter((s) => fits(s, hd.at))).slice(0, 40)) {
+    const near = around(data, h.node, NODE * 1.4);
+    const used = [h];
+    const far = (s) => used.every((u) => Math.hypot(u.x - s.x, u.z - s.z) >= ROOMS_APART && u.node !== s.node);
+    const rooms = [];
+    let failed = false;
+    for (const d of defs) {
+      let spot;
+      if (d.role === 'heart') spot = h;
+      else if (d.role === 'gate') {
+        spot = shuffle(ends.filter((e) => data.nodes[e.node][2] === h.o && near.has(e.node) && far(at(e.node))))[0];
+        if (spot) spot = { ...spot, ...at(spot.node), name: `${KIND[spot.t] || 'Stairs'} to ${floorName(spot.to)}`, kind: 'conn' };
+      } else {
+        spot = shuffle(usable.filter((s) => s.o === h.o && fits(s, d.at) && (near.get(s.node) ?? Infinity) <= NODE && far(s)))[0];
       }
-      if (failed) continue;
-      for (const u of used) taken.add(u.key);
-      out.push({ id: P.id, name: P.name, by: P.by, kernel: P.kernel, idea: P.idea, rooms, heart: rooms.find((x) => x.role === 'heart') });
-      break;
+      if (!spot) { failed = true; break; }
+      used.push(spot);
+      rooms.push({ role: d.role, def: d, name: spot.name, kind: spot.kind, key: spot.key, ...at(spot.node), ...(d.role === 'gate' ? { to: spot.to, t: spot.t } : {}) });
     }
+    if (failed) continue;
+    return {
+      id: P.id, name: P.name, by: P.by, kernel: P.kernel, idea: P.idea, rooms, heart: rooms.find((x) => x.role === 'heart'),
+      date, address: `${P.id}@${date}`,
+      night: { date, season: season(date), phase: chart.phase, sun: chart.planets.sun.sign, moon: chart.planets.moon.sign },
+    };
   }
-  return out;
+  return null;
+}
+
+// a patch address, `id@YYYY-MM-DD`
+export function parseAddress(a) {
+  const m = /^([a-z0-9-]{1,60})@(\d{4}-\d{2}-\d{2})$/.exec(String(a).trim());
+  return m && validDate(m[2]) ? { id: m[1], date: m[2] } : null;
+}
+
+// Sew the night's patches onto the station. Tonight's sky picks, for each patch, a night of its own (a random date),
+// trying again until it lies clear of the patches already sewn; `pick` replays exact addresses instead. Each patch's
+// rooms are real places within a short walk on one floor, its gate a real connector to another underground floor,
+// everything reachable from the level's route without surfacing. Then tonight's sky deals the cards.
+export function sew(data, level, route, day, patches = PATCHES, { max = 4, counter = null, pick = null } = {}) {
+  const sky = typeof day === 'string' ? tonight(day) : day;
+  const ctx = context(data, route);
+  const station = level.station;
+  let out = [];
+  if (pick) {
+    for (const a of pick) {
+      const ad = parseAddress(a);
+      const P = ad && patches.find((p) => p.id === ad.id);
+      const q = P && placePatch(ctx, P, ad.date, station);
+      if (q && !out.some((o) => o.id === q.id)) out.push(q);
+    }
+  } else {
+    // one greedy pass can strand the last patch, so try a few, and keep the fullest quilt
+    const r = rng(skySeed(sky, `${level.id}|quilt`));
+    const want = Math.min(max, patches.length);
+    for (let attempt = 0; attempt < 4 && out.length < want; attempt++) {
+      const order = [...patches];
+      for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+      const got = [], taken = new Set();
+      for (const P of order) {
+        if (got.length >= max) break;
+        for (let t = 0; t < 16; t++) {
+          const q = placePatch(ctx, P, randomDate(r), station);
+          if (!q) continue;
+          if (q.rooms.some((rm) => taken.has(rm.key))) continue;
+          if (got.some((o) => Math.hypot(o.heart.x - q.heart.x, o.heart.z - q.heart.z) < APART)) continue;
+          for (const rm of q.rooms) taken.add(rm.key);
+          got.push(q);
+          break;
+        }
+      }
+      if (got.length > out.length) out = got;
+    }
   }
 
   // the underworld: deal tonight's cards, lowest to the patch nearest daylight, highest to the deepest
@@ -312,6 +355,23 @@ function prop(kind) {
   return g;
 }
 
+// Each patch is a pocket of another night: its season drifts down through the corridor, as if the station were a
+// house of leaves (bigger inside than out), but a cute one.
+const DRIFT = {
+  sakura: { color: 0xf6c6d4, size: 0.09, fall: 0.22, sway: 0.25, say: 'Cherry petals drift down out of the ceiling.' },
+  fireflies: { color: 0xd8ff7a, size: 0.07, fall: 0, sway: 0.18, say: 'Fireflies, underground.' },
+  osmanthus: { color: 0xf2b230, size: 0.07, fall: 0.3, sway: 0.12, say: 'The air smells of osmanthus. Tiny gold flowers fall from nowhere.' },
+  ginkgo: { color: 0xf3d03e, size: 0.11, fall: 0.34, sway: 0.35, say: 'Ginkgo leaves drift down out of the ceiling.' },
+  snow: { color: 0xf4f8ff, size: 0.08, fall: 0.16, sway: 0.15, say: "It's snowing indoors, a little." },
+};
+export function drift(date) {
+  const m = Number(date.slice(5, 7));
+  return m >= 3 && m <= 5 ? 'sakura' : m >= 6 && m <= 8 ? 'fireflies' : m === 9 || m === 10 ? 'osmanthus' : m === 11 ? 'ginkgo' : 'snow';
+}
+// the fog inside a patch: its season's light, brighter under a full moon
+const TINT = { spring: 0xe8c8d0, summer: 0x9fc7a8, autumn: 0xe0b860, winter: 0xc8d8e8 };
+const ZONE = 9;   // within this of any of its rooms, you're in the patch's night
+
 const dirWord = (S, x, z) => {
   const a = Math.atan2(x - S.x, z - S.z) - (S.yaw + Math.PI);   // the kitten faces yaw + π
   const d = Math.atan2(Math.sin(a), Math.cos(a));
@@ -321,11 +381,12 @@ const dirWord = (S, x, z) => {
 };
 
 export class Quilt {
-  constructor(scene, data, level, route, day, store, people, nav) {
+  constructor(scene, data, level, route, day, store, people, nav, pick = null) {
     this.scene = scene; this.data = data; this.store = store; this.people = people;
     this.root = new THREE.Group();
     scene.add(this.root);
-    this.patches = sew(data, level, route, day, PATCHES, { counter: people?.p.counter });
+    this.patches = sew(data, level, route, day, PATCHES, { counter: people?.p.counter, pick });
+    this.zone = null;
     this.timer = null;
     this.walked = [];
     this.marks = [];
@@ -404,9 +465,31 @@ export class Quilt {
         q.portal = { g, x: b.x, z: b.z, o: b.o, ax, az, next: 0 };
       }
     }
+    // each patch's night: its season drifting through it, and its light
+    let seed = 1;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (const q of this.patches) {
+      const kind = drift(q.date), D = DRIFT[kind];
+      // around every room of the patch, not its middle: a patch's rooms can be 75 m apart
+      const cx = q.rooms.reduce((a, r) => a + r.x, 0) / q.rooms.length, cz = q.rooms.reduce((a, r) => a + r.z, 0) / q.rooms.length;
+      const n = 40 * q.rooms.length, pos = new Float32Array(n * 3), y0 = q.heart.o * FH;
+      const home = (i) => q.rooms[i % q.rooms.length];
+      for (let i = 0; i < n; i++) { pos[i * 3] = home(i).x + (rand() - 0.5) * 9; pos[i * 3 + 1] = y0 + rand() * CH; pos[i * 3 + 2] = home(i).z + (rand() - 0.5) * 9; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: D.color, size: D.size, sizeAttenuation: true, transparent: true, opacity: 0.9, depthWrite: false }));
+      pts.frustumCulled = false;
+      this.root.add(pts);
+      const fog = new THREE.Color(0x8c9a8a).lerp(new THREE.Color(TINT[q.night.season]), 0.5);
+      fog.multiplyScalar(0.82 + 0.3 * (1 - Math.cos((q.night.phase * Math.PI) / 180)) / 2);
+      q.warp = { kind, pts, cx, cz, y0, rand, fog, home };
+    }
     this.byId = new Map(this.patches.map((q) => [q.id, q]));
     this.jump = null;
   }
+
+  // the addresses of tonight's patches, for replaying them (?patches=...)
+  addresses() { return this.patches.map((q) => q.address); }
 
   // the spread, in order of the cards
   spread() {
@@ -450,6 +533,7 @@ export class Quilt {
       const m = Math.round(Math.hypot(it.x - S.x, it.z - S.z));
       out.push(`"There's ${it.ja} lying about ${m} m ${dirWord(S, it.x, it.z)}${it.o !== S.o ? `, on ${floorName(it.o)}` : ''}."`);
     } else out.push('"Nothing dropped today that hasn\'t been picked up."');
+    if (q.place === 'deepest' && !q.paid) { q.paid = true; out.push('For listening, this deep: a station stamp.'); this.reward(q, out); }
     const c = this.people?.counter;
     if (this.people?.bag.length && c) out.push(`"The lost-and-found is about ${Math.round(Math.hypot(c.x - S.x, c.z - S.z))} m ${dirWord(S, c.x, c.z)}${c.o !== S.o ? `, on ${floorName(c.o)}` : ''}."`);
     this.enter(q, q.heart);
@@ -466,7 +550,7 @@ export class Quilt {
 
   // the lines for walking into a patch: its name and card, how deep it is, its way up if that's known
   arrive(q) {
-    const out = [`✶ ${q.name} · ${title(q.card)}`];
+    const out = [`✶ ${q.name} · ${title(q.card)}`, `You step into the night of ${longDate(q.date)}. ${DRIFT[q.warp.kind].say}`];
     const deep = Number.isFinite(q.depth) ? `${q.depth.toLocaleString()} m from the street, walking and climbing` : 'nowhere near the street';
     out.push(`Drawn for ${q.card.why}. ${q.place === 'entrance' ? `The way in, ${deep}.` : q.place === 'deepest' ? `The deepest patch tonight, ${deep}.` : `${deep[0].toUpperCase() + deep.slice(1)}.`}`);
     if (q.surface?.known) out.push(`Its way up to the street: exit ${q.surface.exit}.`);
@@ -559,6 +643,30 @@ export class Quilt {
   }
 
   update(dt, S, time) {
+    // which patch's night you're standing in
+    this.zone = this.patches.find((q) => q.heart.o === S.o && q.rooms.some((rm) => Math.hypot(rm.x - S.x, rm.z - S.z) < ZONE)) || null;
+    for (const q of this.patches) {
+      const w = q.warp, D = DRIFT[w.kind];
+      const near = q.heart.o === S.o && q.rooms.some((rm) => Math.hypot(rm.x - S.x, rm.z - S.z) < 35);
+      w.pts.visible = near;
+      if (!near) continue;
+      const p = w.pts.geometry.attributes.position, a = p.array;
+      for (let i = 0; i < p.count; i++) {
+        if (D.fall) {
+          a[i * 3 + 1] -= D.fall * dt * (0.7 + 0.6 * ((i * 37) % 10) / 10);
+          a[i * 3] += Math.sin(time * 0.9 + i) * D.sway * dt;
+          a[i * 3 + 2] += Math.cos(time * 0.7 + i * 1.3) * D.sway * dt;
+          if (a[i * 3 + 1] < w.y0) { const h = w.home(i); a[i * 3 + 1] = w.y0 + CH; a[i * 3] = h.x + (w.rand() - 0.5) * 9; a[i * 3 + 2] = h.z + (w.rand() - 0.5) * 9; }
+        } else {
+          // fireflies hover and wander
+          a[i * 3] += Math.sin(time * 0.6 + i * 2.1) * D.sway * dt;
+          a[i * 3 + 1] = w.y0 + 0.4 + ((i * 0.37) % 1.6) + Math.sin(time * 1.1 + i) * 0.15;
+          a[i * 3 + 2] += Math.cos(time * 0.5 + i * 1.7) * D.sway * dt;
+        }
+      }
+      p.needsUpdate = true;
+      w.pts.material.opacity = D.fall ? 0.9 : 0.55 + 0.4 * Math.sin(time * 3 + q.card.n);
+    }
     for (const { m, rm } of this.marks) {
       if (rm.o !== S.o) { m.material.opacity = 0; continue; }
       const d = Math.hypot(rm.x - S.x, rm.z - S.z);

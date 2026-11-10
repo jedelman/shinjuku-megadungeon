@@ -1,4 +1,7 @@
 // The player: a kitten, 30 cm to the ear tips, with a backpack and a magic wand.
+// Proportions after mofusand's cats (Jason, 2026-11-10, with a reference picture): a big round head wider than the
+// body, big dark eyes set wide and low, a short chubby body on stubby legs. Only the proportions: the coat, the pack
+// and the wand are hers.
 //
 // Built the way PS1 characters were (MegaMan Legends included): rigid segments on a joint hierarchy,
 // no skin. Animation is three.js's own AnimationMixer playing keyframed clips authored here in code:
@@ -40,10 +43,11 @@ const solid = (geo, c) => paint(geo, () => c);
 
 const LEGS = {
   // name: [x, z, front?]  hip/shoulder positions relative to their half of the body
-  legFL: [-0.042, 0.035, true], legFR: [0.042, 0.035, true],
-  legHL: [-0.042, -0.04, false], legHR: [0.042, -0.04, false],
+  legFL: [-0.046, 0.03, true], legFR: [0.046, 0.03, true],
+  legHL: [-0.048, -0.03, false], legHR: [0.048, -0.03, false],
 };
-const UPPER = 0.055, LOWER = 0.052;
+const UPPER = 0.04, LOWER = 0.038;
+export const BODY_Y = 0.1;   // the body's centre, standing: a round body low on stubby legs
 
 export function makeKitten() {
   const m = mat(), glow = mat({ glow: 1 });
@@ -61,67 +65,77 @@ export function makeKitten() {
   };
 
   const root = new THREE.Group();                 // placed by the game; faces +z
-  const body = node('body', root, 0, 0.125, 0);   // bob and pitch
-  const hips = node('hips', body, 0, 0, -0.045);
-  const chest = node('chest', body, 0, 0.004, 0.045);
+  const body = node('body', root, 0, BODY_Y, 0);  // bob and pitch
+  const hips = node('hips', body, 0, 0, -0.03);
+  const chest = node('chest', body, 0, 0.004, 0.03);
 
+  // a short, round body: two fat halves, white underneath and down the front
   const half = (rz, front) => {
-    const g = new THREE.SphereGeometry(1, 10, 8);
-    g.scale(0.082, 0.072, 0.085);
+    const g = new THREE.SphereGeometry(1, 12, 9);
+    g.scale(0.09, 0.082, 0.072);
     return paint(g, (v) => {
-      if (v.y < -0.03 || (front && v.z > 0.04 && v.y < 0.02)) return C.white;
-      return Math.sin((v.z + rz) * 70) > 0.35 ? C.stripe : C.fur;
+      if (v.y < -0.034 || (front && v.z > 0.03 && v.y < 0.03)) return C.white;
+      return Math.sin((v.z + rz) * 70) > 0.4 ? C.stripe : C.fur;
     });
   };
-  add(hips, half(-0.045, false));
-  add(chest, half(0.045, true));
+  add(hips, half(-0.03, false));
+  add(chest, half(0.03, true));
 
-  // head on a neck
-  const neck = node('neck', chest, 0, 0.045, 0.06);
-  const head = node('head', neck, 0, 0.03, 0.035);
-  const skull = new THREE.SphereGeometry(0.07, 10, 8);
-  paint(skull, (v) => (v.z > 0.035 && v.y < 0.0 ? C.white : v.y > 0.045 && Math.abs(v.x) < 0.02 ? C.stripe : C.fur));
+  // a big round head, wider than the body, sitting right on it
+  const neck = node('neck', chest, 0, 0.05, 0.035);
+  const head = node('head', neck, 0, 0.035, 0.03);
+  const skull = new THREE.SphereGeometry(0.09, 14, 11);
+  skull.scale(1.08, 0.94, 0.96);
+  paint(skull, (v) => {
+    if (v.z > 0.03 && v.y < -0.014) return C.white;                                      // a white lower face
+    if (v.y > 0.045 && (Math.abs(v.x) < 0.01 || Math.abs(Math.abs(v.x) - 0.03) < 0.007)) return C.stripe;   // tabby brow
+    return C.fur;
+  });
   add(head, skull);
-  add(head, solid(new THREE.SphereGeometry(0.03, 6, 5), C.white), 0, -0.022, 0.055);
-  add(head, solid(new THREE.SphereGeometry(0.008, 4, 3), C.pink), 0, -0.012, 0.083);
+  // fluffy cheeks and a small white muzzle, with a tiny nose
+  for (const s of [-1, 1]) add(head, paint(new THREE.SphereGeometry(0.042, 8, 6), (v) => (v.y < 0.006 ? C.white : C.fur)), s * 0.058, -0.032, 0.032).scale.set(1, 0.85, 0.9);
+  add(head, solid(new THREE.SphereGeometry(0.03, 8, 6), C.white), 0, -0.036, 0.07).scale.set(1.25, 0.8, 0.75);
+  add(head, solid(new THREE.SphereGeometry(0.0075, 4, 3), C.pink), 0, -0.022, 0.092);
   for (const [s, side] of [[-1, 'L'], [1, 'R']]) {
-    const ear = node('ear' + side, head, s * 0.038, 0.058, -0.005);
-    const eg = paint(new THREE.ConeGeometry(0.03, 0.06, 4), (v) => (v.z > 0.005 ? C.pink : C.fur));
-    eg.translate(0, 0.022, 0);
-    add(ear, eg).rotation.set(-0.15, Math.PI / 4, s * -0.32);
-    const eye = node('eye' + side, head, s * 0.028, 0.008, 0.06);
-    add(eye, solid(new THREE.SphereGeometry(0.0125, 5, 4), C.eye)).scale.set(1, 1.35, 0.6);
-    add(eye, solid(new THREE.SphereGeometry(0.0035, 3, 2), C.white), -s * 0.003, 0.006, 0.008);
+    // small ears, set wide
+    const ear = node('ear' + side, head, s * 0.052, 0.064, -0.012);
+    const eg = paint(new THREE.ConeGeometry(0.032, 0.06, 4), (v) => (v.z > 0.004 ? C.pink : C.fur));
+    eg.translate(0, 0.024, 0);
+    add(ear, eg).rotation.set(-0.12, Math.PI / 4, s * -0.36);
+    // big dark eyes, wide apart and low on the face, each with a highlight
+    const eye = node('eye' + side, head, s * 0.042, -0.006, 0.073);
+    add(eye, solid(new THREE.SphereGeometry(0.0195, 8, 6), C.eye)).scale.set(1, 1.15, 0.5);
+    add(eye, solid(new THREE.SphereGeometry(0.0058, 4, 3), C.white), -s * 0.005, 0.008, 0.008);
   }
 
-  // legs: upper and lower segments, white socks on the lower
+  // stubby legs: upper and lower segments, white socks on the lower
   for (const [name, [x, z, front]] of Object.entries(LEGS)) {
     const top = node(name, front ? chest : hips, x, -0.02, z);
-    const ug = new THREE.CylinderGeometry(0.019, 0.016, UPPER, 5);
+    const ug = new THREE.CylinderGeometry(0.023, 0.021, UPPER, 6);
     ug.translate(0, -UPPER / 2, 0);
     add(top, solid(ug, C.fur));
     const low = node(name + 'Low', top, 0, -UPPER, 0);
-    const lg = new THREE.CylinderGeometry(0.015, 0.014, LOWER, 5);
+    const lg = new THREE.CylinderGeometry(0.02, 0.019, LOWER, 6);
     lg.translate(0, -LOWER / 2, 0);
-    add(low, paint(lg, (v) => (v.y < -LOWER * 0.55 ? C.white : C.fur)));
-    add(low, solid(new THREE.SphereGeometry(0.017, 5, 4), C.white), 0, -LOWER, 0.004).scale.set(1, 0.6, 1.3);
+    add(low, paint(lg, (v) => (v.y < -LOWER * 0.45 ? C.white : C.fur)));
+    add(low, solid(new THREE.SphereGeometry(0.021, 6, 4), C.white), 0, -LOWER, 0.004).scale.set(1, 0.6, 1.25);
   }
 
-  // tail: four segments from the hips
+  // a fluffy tail: four segments from the hips
   let parent = hips;
   for (let i = 0; i < 4; i++) {
-    const seg = node('tail' + i, parent, 0, i ? 0.058 : 0.03, i ? 0 : -0.07);
-    const g = new THREE.CylinderGeometry(0.013 - i * 0.002, 0.015 - i * 0.002, 0.06, 5);
-    g.translate(0, 0.03, 0);
+    const seg = node('tail' + i, parent, 0, i ? 0.048 : 0.03, i ? 0 : -0.064);
+    const g = new THREE.CylinderGeometry(0.018 - i * 0.002, 0.02 - i * 0.002, 0.05, 6);
+    g.translate(0, 0.025, 0);
     add(seg, paint(g, () => (i % 2 ? C.stripe : C.fur)));
     parent = seg;
   }
 
-  // backpack, riding on the chest
-  const pack = node('pack', chest, 0, 0.07, -0.04);
-  add(pack, solid(new THREE.BoxGeometry(0.1, 0.07, 0.11), C.pack));
-  add(pack, solid(new THREE.BoxGeometry(0.104, 0.02, 0.07), C.flap), 0, 0.03, 0.025);
-  for (const s of [-1, 1]) add(pack, solid(new THREE.BoxGeometry(0.012, 0.1, 0.012), C.strap), s * 0.04, -0.045, 0.06);
+  // backpack, riding on the round back
+  const pack = node('pack', chest, 0, 0.085, -0.035);
+  add(pack, solid(new THREE.BoxGeometry(0.1, 0.065, 0.095), C.pack));
+  add(pack, solid(new THREE.BoxGeometry(0.104, 0.02, 0.06), C.flap), 0, 0.028, 0.02);
+  for (const s of [-1, 1]) add(pack, solid(new THREE.BoxGeometry(0.012, 0.09, 0.012), C.strap), s * 0.042, -0.045, 0.05);
 
   // the wand floats at the right shoulder (magic, so it's driven in code, not by clips)
   const wand = new THREE.Group();
@@ -176,7 +190,7 @@ export function makeKitten() {
       const k = 1 - Math.exp(-dt * 10);
       for (const n of Object.keys(act)) weights[n] += (target[n] - weights[n]) * k;
       // stride: cycles advance by distance over stride length, blended across gaits
-      const stride = { walk: 0.2, trot: 0.36, gallop: 0.78, hop: 0.5 };
+      const stride = { walk: 0.15, trot: 0.26, gallop: 0.57, hop: 0.37 };   // short legs, short strides
       let L = 0, W = 0;
       for (const n of GAITS) { L += weights[n] * stride[n]; W += weights[n]; }
       if (W > 1e-3) phase = (phase + (speed * dt) / (L / W)) % 1;
@@ -186,7 +200,7 @@ export function makeKitten() {
       }
       mixer.update(0);
 
-      wand.position.set(0.11, 0.27 + Math.sin(t * 2.3) * 0.015, 0.02 + Math.sin(t * 1.7) * 0.01);
+      wand.position.set(0.125, 0.25 + Math.sin(t * 2.3) * 0.015, 0.04 + Math.sin(t * 1.7) * 0.01);
       wand.rotation.set(0.25, 0, -0.35 + Math.sin(t * 1.3) * 0.08);
       star.rotation.y = t * 2;
     },
@@ -244,7 +258,7 @@ function gaitSpec({ offsets, duty, A, K, bob, pitch, spine = 0, tailLift, tailSw
     spec[`${name}.rot`] = (p) => [leg(p, { duty, A, K, front, offset: off }).up, 0, 0];
     spec[`${name}Low.rot`] = (p) => [leg(p, { duty, A, K, front, offset: off }).low, 0, 0];
   }
-  spec['body.pos'] = (p) => [0, 0.125 + bob(p) + lift * Math.max(0, S(p - 0.1)), 0];
+  spec['body.pos'] = (p) => [0, BODY_Y + bob(p) + lift * Math.max(0, S(p - 0.1)), 0];
   spec['body.rot'] = (p) => [pitch(p), 0, 0];
   spec['hips.rot'] = (p) => [-spine * S(p), 0, 0];          // the spine curls and stretches at a gallop
   spec['chest.rot'] = (p) => [spine * S(p), 0, 0];
@@ -273,7 +287,7 @@ function makeClips() {
     offsets: { legHL: 0, legHR: 0.07, legFL: 0.5, legFR: 0.57 },    // half-bound: hinds then fores
     duty: 0.34, A: 0.95, K: 1.2,
     bob: (p) => 0.004 * S(p), pitch: (p) => 0.16 * S(p + 0.25), headBob: (p) => 0.06 * S(p),
-    spine: 0.22, lift: 0.025, tailLift: 1.4, tailSway: 0.08,
+    spine: 0.16, lift: 0.02, tailLift: 1.4, tailSway: 0.08,
   }));
   const hop = clip('hop', 1, gaitSpec({
     offsets: { legHL: 0, legHR: 0.03, legFL: 0.18, legFR: 0.21 },   // bounding up the steps
@@ -295,16 +309,16 @@ function makeClips() {
 
   // sit: hinds folded under, chest up, front legs straight, tail wrapped round the paws
   const sitSpec = {
-    'body.pos': () => [0, 0.09, -0.02],
-    'body.rot': () => [-0.55, 0, 0],
+    'body.pos': () => [0, BODY_Y - 0.022, -0.015],
+    'body.rot': () => [-0.45, 0, 0],
     'hips.rot': () => [0.2, 0, 0],
     'chest.rot': () => [0.0, 0, 0],
     'chest.scale': (p) => [1, 1 + 0.025 * S(p * 2), 1],
     'legHL.rot': () => [-1.0, 0, 0], 'legHR.rot': () => [-1.0, 0, 0],
     'legHLLow.rot': () => [-1.9, 0, 0], 'legHRLow.rot': () => [-1.9, 0, 0],
-    'legFL.rot': () => [0.55, 0, 0], 'legFR.rot': () => [0.55, 0, 0],
+    'legFL.rot': () => [0.45, 0, 0], 'legFR.rot': () => [0.45, 0, 0],
     'legFLLow.rot': () => [0, 0, 0], 'legFRLow.rot': () => [0, 0, 0],
-    'neck.rot': () => [0.45, 0, 0],
+    'neck.rot': () => [0.35, 0, 0],
     'head.rot': (p) => [0.1, 0.25 * S(p), 0],
     'eyeL.scale': (p) => [1, Math.abs(p - 0.5) < 0.025 ? 0.12 : 1, 1],
     'eyeR.scale': (p) => [1, Math.abs(p - 0.5) < 0.025 ? 0.12 : 1, 1],

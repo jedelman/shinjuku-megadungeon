@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { checkPatch, sew, PATCHES, PATCH_FILES, around } from '../src/patches.js';
+import { checkPatch, sew, PATCHES, PATCH_FILES, around, parseAddress, placePatch, drift } from '../src/patches.js';
 import { plan } from '../src/people.js';
 import { FloorNav, floorKey, distancesTo, nearestNode } from '../src/nav.js';
 import { LEVELS } from '../src/levels.js';
@@ -29,6 +29,16 @@ describe('patches (4–5 room elemental building blocks)', () => {
   });
 });
 
+describe('a chart makes the patch', () => {
+  it('reads addresses, and only well-formed ones', () => {
+    expect(parseAddress('the-last-shutter@1927-12-30')).toEqual({ id: 'the-last-shutter', date: '1927-12-30' });
+    for (const bad of ['the-last-shutter', 'the-last-shutter@1927-13-01', 'The Last Shutter@1927-12-30', '<b>@1927-12-30', '']) expect(parseAddress(bad)).toBeNull();
+  });
+  it('drifts the season of the patch\'s night', () => {
+    expect(['1927-04-01', '1927-07-01', '1927-10-01', '1927-11-15', '1927-12-30'].map(drift)).toEqual(['sakura', 'fireflies', 'osmanthus', 'ginkgo', 'snow']);
+  });
+});
+
 for (const L of LEVELS) {
   describe(`the quilt in ${L.id}`, () => {
     const data = load(L.station);
@@ -38,6 +48,21 @@ for (const L of LEVELS) {
     const route = distancesTo(data, nearestNode(data, gx, gz, L.goal.o), { underground: true });
     const { counter } = plan(data, L, route, '2026-11-10');
     const q = sew(data, L, route, '2026-11-10', PATCHES, { counter });
+
+    it('makes each patch from its own night: its address replays it exactly', () => {
+      const sig = (x) => x.map((p) => [p.address, p.card.n, p.rooms.map((r) => r.key)]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+      const again = sew(data, L, route, '2026-11-10', PATCHES, { counter, pick: q.map((p) => p.address) });
+      expect(sig(again)).toEqual(sig(q));
+      for (const p of q) {
+        expect(parseAddress(p.address)).toEqual({ id: p.id, date: p.date });
+        expect(p.date >= '1900-01-01' && p.date <= '2099-12-31').toBe(true);
+        expect(p.night.date).toBe(p.date);
+      }
+      // alone, a patch is the same patch: its night decides it, not its neighbours
+      const p = q[0];
+      const alone = sew(data, L, route, '2026-11-10', PATCHES, { counter, pick: [p.address] });
+      expect(alone[0].rooms.map((r) => r.key)).toEqual(p.rooms.map((r) => r.key));
+    });
 
     it('sews at least three patches, the same way for the same day', () => {
       expect(q.length).toBeGreaterThanOrEqual(3);

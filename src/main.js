@@ -6,7 +6,7 @@ import { Input } from './input.js';
 import { LEVELS } from './levels.js';
 import { makeKitten } from './kitten.js';
 import { People, Store, places } from './people.js';
-import { Quilt } from './patches.js';
+import { Quilt, parseAddress } from './patches.js';
 import { tonight, describe, longDate } from './sky.js';
 
 const params = new URLSearchParams(location.search);
@@ -103,7 +103,9 @@ function spawn() {
   sky = tonight(params.get('day') || today, params.get('chart'));
   people = new People(scene, data, level, route, sky, store);
   quilt?.dispose();
-  quilt = new Quilt(scene, data, level, route, sky, store, people, nav);
+  // ?patches=id@YYYY-MM-DD,... replays exact patches: a chart makes the patch
+  const pick = params.get('patches') ? params.get('patches').split(',').filter((a) => parseAddress(a)) : null;
+  quilt = new Quilt(scene, data, level, route, sky, store, people, nav, pick && pick.length ? pick : null);
   visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
@@ -296,7 +298,8 @@ function finish() {
     (people.returned ? `<br>You returned ${people.returned} thing${people.returned > 1 ? 's' : ''} to ${people.returned > 1 ? 'their owners' : 'its owner'}.` : '') +
     (people.helped ? `<br>You helped ${people.helped} ${people.helped > 1 ? 'people' : 'person'} find their way.` : '') +
     (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '') +
-    `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.`;
+    `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.` +
+    (quilt.patches.length ? `<br><a href="?level=${levelIndex}&amp;play&amp;patches=${encodeURIComponent(quilt.addresses().join(','))}">Replay tonight's patches</a>: ${quilt.addresses().map(esc).join(' · ')}` : '');
   void n;
 }
 
@@ -333,7 +336,8 @@ function draw(time, dt) {
   }
 
   // fog: fluorescent haze below ground, cold dark outside
-  const env = S.outside ? COLD : WARM;
+  // inside a patch you're in its night: its season's light
+  const env = S.outside ? COLD : quilt?.zone ? { fog: quilt.zone.warp.fog, range: WARM.range } : WARM;
   shared.uFog.value.lerp(env.fog, 0.08);
   shared.uFogRange.value.lerp(env.range, 0.08);
 
@@ -392,7 +396,7 @@ function hud() {
   let fac = '';
   let bd = 70;
   for (const x of data.exits) if (x.o === S.o) { const d = Math.hypot(x.x - S.x, x.z - S.z); if (d < bd) { bd = d; fac = x.fac; } }
-  $('where').textContent = `${floorName(S.o)}${fac ? ' · ' + fac : ''}${S.outside ? ' · outside' : ''}`;
+  $('where').textContent = `${floorName(S.o)}${fac ? ' · ' + fac : ''}${S.outside ? ' · outside' : ''}${quilt?.zone ? ' · ' + longDate(quilt.zone.date) : ''}`;
   $('cold').hidden = !S.outside;
 
   // how far: along the network, never surfacing
@@ -472,7 +476,7 @@ $('title').addEventListener('pointerdown', (e) => {
 });
 $('fs').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); goFullscreen(); });
 $('act').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); input.pressAct(); });
-$('done').addEventListener('click', () => spawn());
+$('done').addEventListener('click', (e) => { if (!e.target.closest('a')) spawn(); });   // the replay link is a link
 
 function resize() { ps1.resize(innerWidth, innerHeight, camera); }
 addEventListener('resize', resize);

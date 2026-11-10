@@ -201,6 +201,47 @@ We take the procedure, with credit; never the book's text, dungeon seeds, art or
   the card's point was above the horizon (houses 7–12). If it was below, it's sealed and secret, found by walking to it.
 - **Depth pays.** The deepest patch pays twice. The deepest place is also where bosses belong, when there are bosses.
 
+## A chart makes the patch: addresses and the time warp (2026-11-10)
+
+Jason: "A chart makes the patch! That way dungeons are addressable and replayable and testable. Plus we get a cool time
+warp in game explanation. A little house of leaves y. But cute!"
+
+**Addresses** (`placePatch` in `src/patches.js`):
+- **One night, one place.** Each patch is placed by its own chart, cast for Tokyo at midnight on its own date, and
+  nothing else. So `the-last-shutter@1927-12-30` always names the same patch in a station, whatever else is sewn that
+  night.
+- **Tonight's picks.** Tonight's sky draws a date for each patch, and draws again (up to 16 times) until the patch lies
+  clear of the others. A few seeded attempts keep the fullest quilt.
+- **Replay.** `?patches=id@YYYY-MM-DD,...` replays exact patches. The finish card links tonight's.
+- **What tonight's sky still does:** it deals the cards (by depth) and so the portals. Same patches under the same sky
+  give the same spread.
+- **Tests replay addresses.** The smoke test runs four pinned addresses under the 1988-08-08 sky.
+
+**The time warp:**
+- **Inside a patch you're in its night.** Within 9 m of any of its rooms:
+  - the HUD shows its date;
+  - the fog takes its season's light, brighter under a full moon;
+  - its season drifts through the corridor.
+- **What drifts, by month:** cherry petals in spring, fireflies in summer, osmanthus in September–October (after the
+  picture Jason sent), ginkgo in November, snow in winter.
+- **The arrival line:** "You step into the night of 28 January 2077. It's snowing indoors, a little."
+- **The idea:** it's the House of Leaves idea, a place bigger inside than out, made cute. The corridor is real; the
+  night inside it isn't.
+- **Rewards:** the deepest patch's talker pays too (two stamps for listening), since the deepest patch in Shinjuku is
+  often the commuter.
+
+## The kitten's proportions (2026-11-10)
+
+Jason sent a mofusand picture: "can we alter Kitty proportions to be more like mofusand". We took only the
+proportions; the coat, the yellow pack and the wand are hers, and she's not a mofusand character.
+- A big round head, wider than the body.
+- Big dark eyes, set wide and low.
+- Fluffy cheeks and a small white muzzle.
+- A short round body on stubby legs (7.8 cm against 10.7 before).
+- A fluffier tail.
+
+Strides shrank with the legs (walk 0.15 m, trot 0.26 m, gallop 0.57 m), so her paws still plant, and she scurries.
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -248,6 +289,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **3.** Tokyo Station area (MLIT data #2). **Done 2026-11-10 as level 1:** Higashi-Ginza → Otemachi, 2.7 km.
 - **3b. Done 2026-11-10:** patches (above): four of them, sewn daily onto every level.
 - **3c. Done 2026-11-10:** the underworld: tonight's horoscope deals a tarot spread onto the patches by real depth; wand portals.
+- **3d. Done 2026-11-10:** a chart makes the patch (addresses, replay, the time warp); the kitten's new proportions.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 

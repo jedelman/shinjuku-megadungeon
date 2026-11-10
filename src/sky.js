@@ -158,13 +158,23 @@ export function validDate(s) {
 // choose (?chart=YYYY-MM-DD).
 export function tonight(day, chosen = null) {
   if (validDate(chosen)) return cast(chosen);
-  const r = rng(hash(`sky|${day}`));
+  return cast(randomDate(rng(hash(`sky|${day}`))));
+}
+
+// a date between 1900 and 2099, from a seeded generator
+export function randomDate(r) {
   const from = Date.UTC(2000, 0, 1) - 100 * 365.2425 * 864e5;   // ~1900-01-01
   const span = 200 * 365.2425;
   const t = new Date(Math.round(from / 864e5 + Math.floor(r() * span)) * 864e5);
   const y = Math.max(1900, Math.min(2099, t.getUTCFullYear()));
   const date = `${String(y).padStart(4, '0')}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
-  return cast(validDate(date) ? date : '1927-12-30');
+  return validDate(date) ? date : '1927-12-30';
+}
+
+// the season a date falls in, as Tokyo has it
+export function season(date) {
+  const m = Number(date.slice(5, 7));
+  return m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
 }
 
 // the chart is the seed: every position, to a hundredth of a degree, plus what it's seeding
