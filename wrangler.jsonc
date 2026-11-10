@@ -1,0 +1,6 @@
+// Static site on Cloudflare Workers (assets only). Workers Builds: build `npm run build`, deploy `npx wrangler deploy`.
+{
+  "name": "shinjuku-megadungeon",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist" }
+}
