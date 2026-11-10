@@ -33,6 +33,12 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   ODbL notice and "© OpenStreetMap contributors" in the game's credits. Don't mix it into the MLIT JSON.
   From cloud sessions, Overpass is blocked by the network policy, but the main API works:
   `https://api.openstreetmap.org/api/0.6/map?bbox=...` for station-sized boxes. Don't route around the block.
+- **ほこナビ walking-network data** (`data/raw/hokonavi/`): Public Data License 1.0 (CC BY 4.0-compatible).
+  Credit each dataset and say we processed it; see that folder's README. The three Oedo station sets are a
+  limited release (gone from the portal after 2027-03-12), which is why they're committed.
+- **PLATEAU** (fetched, not committed): we choose CC BY 4.0. Credit 「3D都市モデル（Project PLATEAU）新宿区（2025年度）」（国土交通省）を加工して作成.
+- **Tokyo Metropolitan Government** Shinjuku terminal data (fetched, not committed): CC BY, credit 東京都都市整備局.
+- The full source inventory with dataset ids is in `docs/design.md`.
 - Code is MIT (`LICENSE`).
 
 ## Content rules

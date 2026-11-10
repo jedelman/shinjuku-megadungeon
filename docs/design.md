@@ -15,11 +15,14 @@ links, are in `claude-memory/conversations/2026-11-10-tokyo-megadungeon.md`.
 ## Decisions (Jason, 2026-11-10)
 
 - **Roguelike.** Runs, loot, a dungeon that shifts.
-- **Lost property is returned.** "Returned property? Absolutely. Loot for a roguelike." My reading, to
-  confirm: what you find in the dungeon is lost property (忘れ物). During a run you can *use* it (that's the
-  loot), or carry it to a lost-and-found counter (忘れ物取扱所) and *return* it. Returning is the permanent
-  progress. Use it now or give it back: that's the run's core choice. It's also the commons move, and the
-  inversion of SHINJUKU_CRAWLER (a TTRPG where you seize lost property).
+- **Lost property is useless in the dungeon.** Return it to the NPC who lost it and they'll give you
+  something useful (Jason, 2026-11-10). So every find is a small quest: carry it (it takes up space and
+  does nothing), find whose it is, get something you can actually use. Nothing is looted; things go back.
+  The station's real lost-and-found office is in the TMG data (`StationOffice/LostandFoundoffice`, B3F),
+  a natural hub for hints about who lost what. Still open: do owners wander, wait somewhere, or leave word
+  at that office?
+- **Standalone renderer** (Jason, 2026-11-10). This is its own game with its own renderer, not a realm
+  inside Dream of the Earth.
 - **Dream of the Earth links here.** A shrine in Dream links to this page. It needs a change in
   `jedelman/dream-of-the-earth` once this game has a public URL.
 
@@ -52,6 +55,23 @@ fixed; hoardings, closures and loot move with the daily seed. Real closures alre
 That is the roguelike, and it's true to the place. The MLIT map is itself a 2016–2020 snapshot of a
 station that has since been torn up: the old map is literally out of date.
 
+## Open data around Shinjuku: the inventory (checked 2026-11-10)
+
+| source | id | licence | what it adds | in repo? |
+|---|---|---|---|---|
+| MLIT indoor map, Shinjuku (2020) | G-Spatial `mlit-indoor-shinjuku-r2` | 政府標準利用規約 2.0 | rooms, columns, exits, gates, network, B3–4F | yes, raw zip |
+| MLIT walking networks (ほこナビ) | `station_oedo_tochomae`, `station_oedo_shinjuku`, `station_oedo_shinjukunishiguchi` | PDL 1.0 | **floor plans + networks** for three Oedo stations, down to **B6**; Tochomae is Astra's west end | yes (limited release, gone after 2027-03-12) |
+| MLIT walking network (ほこナビ, 2021) | `nwd_shibuya_sendagaya_shinjuku` | PDL 1.0 | network only, wide; **underground links along the west passage toward Tochomae** | yes, gzipped |
+| PLATEAU Shinjuku-ku FY2025 | G-Spatial `plateau-13104-shinjuku-ku-2025` (udx/ubld) | CC BY 4.0 (one of four) | underground-mall model, LOD4.1: walls, ceilings, 1,364 doors, **real elevations** (B1 ≈ 33 m, B2 ≈ 25 m, deep ≈ 15.5 m above sea level); central 0.04 km² only | fetched by `tools/fetch_sources.py` |
+| Tokyo Metropolitan Government | catalog `t000008d0000000037`, G-Spatial `tmg-shinjuku-navigation` | CC BY | same footprint as MLIT; adds B4F/B5F circulation, mezzanines, 451 names on B1F, the lost-and-found office | fetched by `tools/fetch_sources.py` |
+| MLIT indoor map, Tokyo Station area (2021) | G-Spatial `mlit-indoor-tokyo-r2` | 政府標準利用規約 2.0 | the second megadungeon | **needs Jason's G-Spatial login** |
+| MLIT walking networks (ほこナビ) | `nwd_tokyo`, `nwd_chiyoda_chuo`, `nwd_ikebukuro`, `nwd_ueno_station`, and Oedo stations `station_oedo_*` (Aoyama-itchome, Akabanebashi, Daimon, Kokuritsu-kyogijo, Azabu-juban, Higashi-shinjuku, Roppongi, Ueno-okachimachi, Yoyogi) | PDL 1.0 | other stations, later | no login needed |
+
+**Still in no official open dataset:** the Metro Promenade's east end, Shinjuku-sanchome station, and
+Nishi-Shinjuku station (Marunouchi line), all street-level-only in the 2021 network. Platforms for JR, Odakyu,
+Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), which has the
+メトロプロムナード, E9, and Nishi-Shinjuku's platforms down to door positions.
+
 ## Archetypes → mechanics (from Bluesky, 2026-11-10)
 
 - **Depth as floors.** The Oedo line "runs on Brazil standard time". Nagatacho has 146 steps to the street.
@@ -75,8 +95,9 @@ station that has since been torn up: the old map is literally out of date.
 
 - **0 (this PR).** Pipeline, PS1 renderer, walkable Shinjuku on all floors, stairs/escalators/lifts, the
   outside rule, keyboard/gamepad/touch, landscape, and level 0: Seibu B2 → 京王新線口, 1.1 km.
-- **1.** Astra's route: stitch OSM's east (Sanchome, Metro Promenade) and west (Tochomae, E9, Nishi-Shinjuku)
-  onto the MLIT core, then verify kira's "A17 dead-ends" claim against the data.
+- **1.** Astra's route. West: the Tochomae floor plans (ほこナビ) plus the 2021 network's underground passage.
+  East: OSM's Metro Promenade to Sanchome. Nishi-Shinjuku and E9 from OSM. Stitch onto the MLIT core, then
+  verify kira's "A17 dead-ends" claim against the data. Use PLATEAU's elevations for true floor depths.
 - **2.** Lost property and runs: finds, use or return, the lost-and-found counter, the daily seed.
 - **3.** Tokyo Station area (MLIT data #2).
 - **4.** The network: lines, trains, more stations from OSM.
@@ -86,5 +107,4 @@ station that has since been torn up: the old map is literally out of date.
 
 - Merge authority and a deploy target (Cloudflare Workers Builds like Dream? `wrangler.jsonc` is ready,
   assets only; build `npm run build`, deploy `npx wrangler deploy`). Which domain?
-- Confirm the reading of "Returned property? Absolutely. Loot for a roguelike."
 - Gamepad, touch and landscape are untested on real hardware.
