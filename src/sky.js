@@ -146,10 +146,11 @@ export function cast(date, at = TOKYO) {
 
 // Nights the game never steps into. The time warp drops you into a date's night in Tokyo's underground, so these are
 // never drawn and can't be chosen (?chart=, ?patches=): the 1995 sarin attack on these very lines (CLAUDE.md: never
-// content), the 1923 Great Kantō earthquake, the air raids on Tokyo (the first B-29 raid to the surrender), and the
-// 2011 Tōhoku earthquake. Each range is inclusive, with a day either side.
+// content), the 1923 Great Kantō earthquake, the war years (Jason, 2026-11-10: "let's exclude the war years"), and
+// the 2011 Tōhoku earthquake. Each range is inclusive, with a day either side.
 export const SOMBRE = [
   ['1923-08-31', '1923-09-03'],   // Great Kantō earthquake, 1 September 1923
+  ['1931-09-17', '1945-09-03'],   // the war years, the "Fifteen Years' War" (十五年戦争): the Mukden Incident, 18 September 1931, to the surrender signed 2 September 1945
   ['1944-11-23', '1945-08-16'],   // the air raids on Tokyo, 24 November 1944 to the surrender, 15 August 1945
   ['1995-03-19', '1995-03-21'],   // the sarin attack on the subway, 20 March 1995
   ['2011-03-10', '2011-03-12'],   // the Tōhoku earthquake, 11 March 2011

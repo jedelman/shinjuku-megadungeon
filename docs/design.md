@@ -230,9 +230,12 @@ warp in game explanation. A little house of leaves y. But cute!"
 - **Nights we never step into** (`SOMBRE`): they're never drawn and can't be chosen.
   - 20 March 1995: the sarin attack on these very lines. It's never content.
   - The 1923 Great Kantō earthquake.
-  - The air raids on Tokyo, from 24 November 1944 to the surrender.
+  - The war years (Jason: "let's exclude the war years"): 18 September 1931, the Mukden Incident, to 2 September 1945,
+    the surrender. That's the span called the Fifteen Years' War (十五年戦争), chosen as the broader reading.
+  - The air raids on Tokyo, from 24 November 1944 to the surrender (inside the war years; kept, since dates are never
+    removed).
   - 11 March 2011.
-  A day either side of each. Whether to exclude more (the war years as a whole) is Jason's call.
+  A day either side of each. The occupation years after 1945 stay in.
 - **Rewards:** the deepest patch's talker pays too (two stamps for listening), since the deepest patch in Shinjuku is
   often the commuter.
 
