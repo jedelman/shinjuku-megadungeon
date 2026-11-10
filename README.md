@@ -28,6 +28,12 @@ Each patch has 4–5 rooms on real places: a heart with a reason to explore, tal
 stitches it to the next patch, and a gate to another floor. They're sewn somewhere new each day. Patches are small
 JSON files written against kinds of place, so anyone can write one and it fits any station: see `patches/README.md`.
 
+Each night has a sky. The game casts a horoscope for Tokyo at midnight on a random date (one per day; `?chart=YYYY-MM-DD`
+picks your own), and the chart deals a tarot spread onto the patches. It follows the underworld procedure in Rise Up
+Comus's *His Majesty the Worm*: the lowest card is the way in, the highest is the deepest patch (measured from the real
+exits), and cards I–V have ways up to the street, sealed if their card was below the horizon. Cards that connect but
+aren't neighbours open portals, cast with the kitten's wand.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
@@ -52,7 +58,9 @@ Astra's route also uses 「歩行空間ネットワークデータ（都営地�
 （国土交通省）（https://ckan.hokonavi.go.jp）を加工して作成, Public Data License 1.0, and OpenStreetMap data,
 © OpenStreetMap contributors, under the ODbL. Its combined data file (`public/data/shinjuku-astra.json`) is
 therefore under the ODbL 1.0.
-Patch structure after Rise Up Comus (Joshy Mcroo), "The Elemental Level of Megadungeon Construction" (2026).
+Patch structure after Rise Up Comus (Joshy Mcroo), "The Elemental Level of Megadungeon Construction" (2026); the
+underworld layout after his *His Majesty the Worm*, Appendix E. Planet positions: our own implementation of Paul
+Schlyter's method, tested against astronomy-engine (MIT, development only).
 Used under the Government of Japan Standard Terms of Use (2.0), compatible with CC BY 4.0. The map has
 been processed for this game: walls, collision and floor connections are derived from it.
 

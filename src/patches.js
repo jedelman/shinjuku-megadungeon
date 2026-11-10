@@ -10,11 +10,18 @@
 // them a short walk apart, and its gate is a real stair, escalator or lift to another floor. Patches are written
 // against kinds of place, never coordinates, so one patch sews into any station. They're data (patches/*.json),
 // so a friend's patch is a file, checked against hard caps like any untrusted input. sew() is pure and seeded by
-// level and date, like the people; Quilt renders it and runs the kernels.
+// tonight's chart (src/sky.js), like the people; Quilt renders it and runs the kernels.
+//
+// Then the underworld (src/arcana.js, after His Majesty the Worm's layout procedure): the chart deals a major arcana
+// card to each patch, lowest card to the shallowest patch (nearest daylight, by walking distance to an open exit),
+// highest to the deepest. Patches next to each other on the table are stitched with chalk; the others the cards
+// connect are joined by portals the kitten casts with her wand.
 import * as THREE from 'three';
 import { FH } from './world.js';
-import { nearestNode, FloorNav, floorKey } from './nav.js';
-import { places, rng, hash, box, makePerson } from './people.js';
+import { nearestNode, FloorNav, floorKey, MinHeap } from './nav.js';
+import { places, rng, hash, box, makePerson, label } from './people.js';
+import { tonight, skySeed } from './sky.js';
+import { draw, layout, title, roman } from './arcana.js';
 
 export const KERNELS = ['explore', 'talk', 'run'];
 const ROLES = ['heart', 'room', 'blank', 'gate'];
@@ -90,26 +97,52 @@ function adjacency(data) {
 export function around(data, src, max) {
   const adj = adjacency(data);
   const dist = new Map([[src, 0]]);
-  const open = [[0, src]];
-  while (open.length) {
-    let bi = 0;
-    for (let i = 1; i < open.length; i++) if (open[i][0] < open[bi][0]) bi = i;
-    const [d, u] = open.splice(bi, 1)[0];
+  const heap = new MinHeap();
+  heap.push(0, src);
+  while (heap.size) {
+    const [d, u] = heap.pop();
     if (d > dist.get(u)) continue;
     for (const [v, w] of adj[u]) {
       const nd = d + w;
       if (nd > max || data.nodes[v][2] >= 0) continue;
-      if (nd < (dist.get(v) ?? Infinity)) { dist.set(v, nd); open.push([nd, v]); }
+      if (nd < (dist.get(v) ?? Infinity)) { dist.set(v, nd); heap.push(nd, v); }
     }
   }
   return dist;
+}
+
+// How far every node is from the street: walking to the nearest open exit, plus that exit's climb (MLIT puts many exits
+// at the foot of their stairs, on B1 or B2; the climb is counted at the game's 5 m a floor, a design value, not data).
+// This is the underworld's depth ("Dungeon levels farther away from the entrances are more difficult to access").
+const EGRESS = new WeakMap();
+export function egress(data) {
+  if (EGRESS.has(data)) return EGRESS.get(data);
+  const adj = adjacency(data);
+  const dist = new Float64Array(data.nodes.length).fill(Infinity);
+  const exit = new Int32Array(data.nodes.length).fill(-1);
+  const heap = new MinHeap();
+  data.exits.forEach((e, i) => {
+    if (e.closed) return;
+    const k = nearestNode(data, e.x, e.z, e.o, 15);
+    const climb = Math.max(0, -e.o) * FH;
+    if (k >= 0 && climb < dist[k]) { dist[k] = climb; exit[k] = i; heap.push(climb, k); }
+  });
+  while (heap.size) {
+    const [d, u] = heap.pop();
+    if (d > dist[u]) continue;
+    for (const [v, w] of adj[u]) if (d + w < dist[v]) { dist[v] = d + w; exit[v] = exit[u]; heap.push(dist[v], v); }
+  }
+  const out = { dist, exit };
+  EGRESS.set(data, out);
+  return out;
 }
 
 // Sew the day's patches onto the station: each heart on a real place of the kind it asks for, its rooms on other
 // real places within a short walk on the same floor, its gate on a real connector to another underground floor,
 // everything reachable from the level's route without surfacing. Patches that don't fit today are left out.
 export function sew(data, level, route, day, patches = PATCHES, { max = 4, counter = null } = {}) {
-  const r = rng(hash(`${level.id}|${day}|quilt`));
+  const sky = typeof day === 'string' ? tonight(day) : day;
+  const r = rng(skySeed(sky, `${level.id}|quilt`));
   const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const navs = new Map();
   const walkable = (k) => {
@@ -179,16 +212,66 @@ export function sew(data, level, route, day, patches = PATCHES, { max = 4, count
   return out;
   }
 
-  // fill the blanks: each one stitches its patch to the next patch in the quilt (or, alone, to the lost-and-found)
-  for (const [i, q] of out.entries()) {
+  // the underworld: deal tonight's cards, lowest to the patch nearest daylight, highest to the deepest
+  const eg = egress(data);
+  // a patch's depth is the mean over its rooms (a heart that sits on an exit doesn't make the whole patch shallow)
+  // Shinjuku is riddled with exits, so patches are often equally deep; then the lower floor is deeper, then the
+  // patch with the deepest room, then the name
+  const key = new Map();
+  for (const q of out) {
+    const ds = q.rooms.map((rm) => eg.dist[rm.node]).filter(Number.isFinite);
+    const mean = ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : Infinity;
+    q.depth = Number.isFinite(mean) ? Math.round(mean) : Infinity;
+    key.set(q, [mean, -q.heart.o, ds.length ? Math.max(...ds) : Infinity]);
+  }
+  out.sort((a, b) => {
+    const [ka, kb] = [key.get(a), key.get(b)];
+    return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2] || (a.id < b.id ? -1 : 1);
+  });
+  const cards = draw(sky, out.length).sort((a, b) => a.n - b.n);
+  out.forEach((q, i) => { q.card = cards[i]; });
+  const table = out.length ? layout(cards) : null;
+  const byCard = new Map(out.map((q) => [q.card.n, q]));
+  for (const q of out) {
+    const n = q.card.n;
+    q.place = n === table.entrance ? 'entrance' : n === table.deepest ? 'deepest' : table.side.includes(n) ? 'beside' : 'between';
+    // cards I–V (and the entrance) open to the street: the patch's nearest open exit, known if its card was above
+    // the horizon tonight, sealed and secret if below
+    q.surface = null;
+    if (table.surface.includes(n)) {
+      const e = data.exits[eg.exit[q.heart.node]];
+      if (e) {
+        const k = nearestNode(data, e.x, e.z, e.o, 15);
+        q.surface = { exit: e.n, x: e.x, z: e.z, o: e.o, node: k, known: q.card.up };
+      }
+    }
+    // connections: neighbours on the table are walked (a chalk stitch), the rest are portals
+    q.portals = [];
+    q.walks = [];
+    for (const e of table.edges) {
+      if (e.a !== n && e.b !== n) continue;
+      const other = byCard.get(e.a === n ? e.b : e.a);
+      if (e.how.includes('adjacent')) q.walks.push(other.id);
+      else q.portals.push({ to: other.id, how: e.how });
+    }
+  }
+
+  // fill the blanks: a chalk stitch to the next patch down the table (the deepest points back up, the cards beside the
+  // entrance point to it); a lone patch points to the lost-and-found
+  const byId = new Map(out.map((q) => [q.id, q]));
+  const column = table ? table.column.map((n) => byCard.get(n)) : [];
+  for (const q of out) {
     const b = q.rooms.find((x) => x.role === 'blank');
-    const other = out.length > 1 ? out[(i + 1) % out.length] : null;
-    const target = other ? { name: other.name, ...other.heart } : counter ? { name: '忘れ物取扱所 (lost and found)', x: counter.x, z: counter.z, o: counter.o, node: nearestNode(data, counter.x, counter.z, counter.o, 40) } : null;
+    let other = null;
+    if (q.place === 'beside') other = byCard.get(table.entrance);
+    else if (column.length > 1) { const i = column.indexOf(q); other = column[i + 1] || column[i - 1]; }
+    else if (q.walks.length) other = byId.get(q.walks[0]);
+    const target = other ? { ...other.heart, name: other.name } : counter ? { name: '忘れ物取扱所 (lost and found)', x: counter.x, z: counter.z, o: counter.o, node: nearestNode(data, counter.x, counter.z, counter.o, 40) } : null;
+    b.stitch = null;
     if (target && target.node >= 0) {
       const m = Math.round(around(data, target.node, 4000).get(b.node) ?? NaN);
-      if (Number.isFinite(m)) { b.stitch = { name: target.name, m, o: target.o }; continue; }
+      if (Number.isFinite(m)) b.stitch = { name: target.name, m, o: target.o };
     }
-    b.stitch = null;
   }
   return out;
 }
@@ -296,7 +379,40 @@ export class Quilt {
         this.root.add(v.g);
         q.person = v;
       }
+      // the patch's card, hung over its heart
+      const card = label(roman(q.card.n), '#2a2418', '#efe6cc', 160, 96);
+      card.scale.set(0.42, 0.26, 1);
+      card.position.set(q.heart.x, q.heart.o * FH + 1.6, q.heart.z);
+      this.root.add(card);
+      q.cardSprite = card;
+      // a portal in the blank, if the cards connect this patch to one it doesn't neighbour on the table
+      const b = q.rooms.find((x) => x.role === 'blank');
+      if (q.portals.length) {
+        const g = new THREE.Group();
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 6, 18), new THREE.MeshBasicMaterial({ color: 0xc8a8ff, transparent: true, opacity: 0.9 }));
+        const veil = new THREE.Mesh(new THREE.CircleGeometry(0.46, 18), new THREE.MeshBasicMaterial({ color: 0x7a4ad8, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+        g.add(ring, veil);
+        g.position.set(b.x, b.o * FH + 0.6, b.z);
+        this.root.add(g);
+        // where you step out when you arrive: just off the ring, on the floor
+        const n = nav(b.o);
+        let ax = b.x, az = b.z;
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          if (n.inside(b.x + Math.sin(a) * 1.3, b.z + Math.cos(a) * 1.3)) { ax = b.x + Math.sin(a) * 1.3; az = b.z + Math.cos(a) * 1.3; break; }
+        }
+        q.portal = { g, x: b.x, z: b.z, o: b.o, ax, az, next: 0 };
+      }
     }
+    this.byId = new Map(this.patches.map((q) => [q.id, q]));
+    this.jump = null;
+  }
+
+  // the spread, in order of the cards
+  spread() {
+    const qs = [...this.patches].sort((a, b) => a.card.n - b.card.n);
+    if (!qs.length) return [];
+    return [`The spread: ${qs.map((q) => `${title(q.card)}${q.place === 'entrance' ? ' (the way in)' : q.place === 'deepest' ? ' (the deepest)' : ''}`).join(' · ')}`];
   }
 
   dispose() { this.scene.remove(this.root); }
@@ -306,11 +422,27 @@ export class Quilt {
       if (q.kernel !== 'talk' || q.heart.o !== S.o) continue;
       if (Math.hypot(q.px - S.x, q.pz - S.z) < 1.9) return { from: 'quilt', kind: 'talk', q, prompt: 'Listen' };
     }
+    for (const q of this.patches) {
+      if (!q.portal || q.portal.o !== S.o || Math.hypot(q.portal.x - S.x, q.portal.z - S.z) > 1.6) continue;
+      const to = this.byId.get(q.portals[q.portal.next % q.portals.length].to);
+      return { from: 'quilt', kind: 'portal', q, prompt: `Cast: ${roman(q.card.n)} → ${title(to.card)}` };
+    }
     return null;
   }
 
   act(n, S) {
     const q = n.q;
+    if (n.kind === 'portal') {
+      const link = q.portals[q.portal.next++ % q.portals.length];
+      const to = this.byId.get(link.to);
+      const [hi, lo] = q.card.n > to.card.n ? [q.card, to.card] : [to.card, q.card];
+      const why = link.how.includes('divisible')
+        ? `${roman(lo.n === 0 ? lo.n : hi.n)} is divisible by ${roman(lo.n === 0 ? hi.n : lo.n)}.`
+        : `${roman(lo.n)} and ${roman(hi.n)} follow each other.`;
+      const p = to.portal;
+      this.jump = { x: p.ax, z: p.az, o: p.o, yaw: Math.atan2(p.ax - p.x, p.az - p.z) };
+      return [`You raise your wand. The ring of ${title(q.card)} opens onto ${title(to.card)}: ${why}`, `You step out in ${to.name}.`];
+    }
     const out = [...q.heart.def.say];
     const items = (this.people?.items || []).filter((it) => !it.taken);
     if (items.length) {
@@ -332,9 +464,30 @@ export class Quilt {
     return true;
   }
 
+  // the lines for walking into a patch: its name and card, how deep it is, its way up if that's known
+  arrive(q) {
+    const out = [`✶ ${q.name} · ${title(q.card)}`];
+    const deep = Number.isFinite(q.depth) ? `${q.depth.toLocaleString()} m from the street, walking and climbing` : 'nowhere near the street';
+    out.push(`Drawn for ${q.card.why}. ${q.place === 'entrance' ? `The way in, ${deep}.` : q.place === 'deepest' ? `The deepest patch tonight, ${deep}.` : `${deep[0].toUpperCase() + deep.slice(1)}.`}`);
+    if (q.surface?.known) out.push(`Its way up to the street: exit ${q.surface.exit}.`);
+    return out;
+  }
+
+  reward(q, out) {
+    this.store.stamp();
+    if (q.place === 'deepest') { this.store.stamp(); out.push('The deepest patch tonight pays twice: a second stamp.'); }
+  }
+
   // every few frames: rooms you've walked into, the run kernel's clock. Returns lines to show.
   tick(S) {
     const out = [];
+    for (const q of this.patches) {
+      const w = q.surface;
+      if (!w || w.known || w.found || w.o !== S.o || Math.hypot(w.x - S.x, w.z - S.z) > 6) continue;
+      w.found = true;
+      this.store.bump('secrets');
+      out.push(`A sealed way up, found: exit ${w.exit}. ${title(q.card)} was below the horizon tonight.`);
+    }
     if (this.timer && performance.now() > this.timer.until) {
       const q = this.timer.q;
       this.timer = null;
@@ -349,16 +502,16 @@ export class Quilt {
         if (this.timer && this.timer.q === q && rm === this.timer.gate) {
           this.timer = null;
           q.state = 'won';
-          this.store.stamp();
           out.push(...q.heart.def.found);
+          this.reward(q, out);
           this.enter(q, rm);
           continue;
         }
         // explore's find, once every room around the heart has been found
         if (rm.role === 'heart' && q.kernel === 'explore' && q.state !== 'found' && ring.every((x) => q.seen.has(x))) {
           q.state = 'found';
-          this.store.stamp();
           out.push(...q.heart.def.found);
+          this.reward(q, out);
           this.enter(q, rm);
           continue;
         }
@@ -368,7 +521,7 @@ export class Quilt {
           if (rm.role === 'heart' && q.kernel === 'run' && q.state === null && !this.timer) this.start(q, out);
           continue;
         }
-        if (first) out.push(`✶ ${q.name}`);
+        if (first) out.push(...this.arrive(q));
         if (rm.role === 'blank') {
           out.push(rm.stitch ? `Chalked on the floor: an arrow, and "${rm.stitch.name}", ${rm.stitch.m.toLocaleString()} m${rm.stitch.o !== rm.o ? ` (${floorName(rm.stitch.o)})` : ''}.` : `${rm.name}. Nothing here yet.`);
         } else if (rm.role === 'gate') {
@@ -411,9 +564,18 @@ export class Quilt {
       const d = Math.hypot(rm.x - S.x, rm.z - S.z);
       m.material.opacity = Math.max(0, Math.min(1, (16 - d) / 8)) * 0.8;
     }
-    for (const q of this.patches) if (q.person) {
-      q.person.g.visible = q.heart.o === S.o;
-      q.person.head.rotation.y = Math.sin(time * 0.4 + q.heart.x) * 0.5;
+    for (const q of this.patches) {
+      if (q.person) {
+        q.person.g.visible = q.heart.o === S.o;
+        q.person.head.rotation.y = Math.sin(time * 0.4 + q.heart.x) * 0.5;
+      }
+      q.cardSprite.visible = q.heart.o === S.o;
+      q.cardSprite.position.y = q.heart.o * FH + 1.6 + Math.sin(time * 1.3 + q.card.n) * 0.03;
+      if (q.portal) {
+        q.portal.g.visible = q.portal.o === S.o;
+        q.portal.g.rotation.y = time * 0.8;
+        q.portal.g.children[1].material.opacity = 0.25 + 0.15 * Math.sin(time * 2.4 + q.card.n);
+      }
     }
   }
 }

@@ -69,6 +69,36 @@ for (const L of LEVELS) {
       expect(new Set(keys).size).toBe(keys.length);   // no place in two patches
     });
 
+    it('deals tonight\'s cards by depth: lowest to the patch nearest an exit, highest to the deepest', () => {
+      const byDepth = [...q].sort((a, b) => a.depth - b.depth);
+      expect(byDepth.map((p) => p.card.n)).toEqual([...q.map((p) => p.card.n)].sort((a, b) => a - b));
+      expect(new Set(q.map((p) => p.card.n)).size).toBe(q.length);
+      expect(byDepth[0].place).toBe('entrance');
+      expect(byDepth.at(-1).place).toBe('deepest');
+      for (const p of q) expect(Number.isFinite(p.depth)).toBe(true);
+    });
+
+    it('opens portals only between patches the cards connect that aren\'t neighbours on the table, both ways', () => {
+      const byId = new Map(q.map((p) => [p.id, p]));
+      for (const p of q) for (const link of p.portals) {
+        const o = byId.get(link.to);
+        expect(o.portals.some((l) => l.to === p.id)).toBe(true);
+        expect(p.walks).not.toContain(o.id);
+        const [a, b] = [p.card.n, o.card.n].sort((x, y) => x - y);
+        expect(b - a === 1 || (a === 0 ? true : b % a === 0)).toBe(true);
+      }
+    });
+
+    it('gives a way up to the street only to the entrance and cards I–V, known if the card was above the horizon', () => {
+      for (const p of q) {
+        if (p.surface) {
+          expect(p.place === 'entrance' || (p.card.n >= 1 && p.card.n <= 5)).toBe(true);
+          expect(p.surface.known).toBe(p.card.up);
+          expect(p.surface.exit).toBeTruthy();
+        } else expect(p.place !== 'entrance' && !(p.card.n >= 1 && p.card.n <= 5)).toBe(true);
+      }
+    });
+
     it("gives every patch a gate to another underground floor, and stitches every blank", () => {
       for (const p of q) {
         for (const g of p.rooms.filter((r) => r.role === 'gate')) {
@@ -79,6 +109,8 @@ for (const L of LEVELS) {
         const b = p.rooms.find((r) => r.role === 'blank');
         expect(b.stitch).toBeTruthy();
         expect(b.stitch.m).toBeGreaterThan(0);
+        // a stitch names a patch (the one it walks to), never the place that patch's heart sits on
+        expect(q.map((o) => o.name).filter((n) => n !== p.name)).toContain(b.stitch.name);
       }
     });
   });

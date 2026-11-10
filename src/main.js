@@ -7,6 +7,7 @@ import { LEVELS } from './levels.js';
 import { makeKitten } from './kitten.js';
 import { People, Store, places } from './people.js';
 import { Quilt } from './patches.js';
+import { tonight, describe, longDate } from './sky.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -82,7 +83,7 @@ scene.add(beacon);
 const input = new Input(canvas);
 const store = new Store((() => { try { return localStorage; } catch { return null; } })());
 const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
-let people = null, quilt = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
+let people = null, quilt = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
   ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0, speed: 0,
@@ -98,12 +99,22 @@ function spawn() {
     surfaced: 0, walked: 0, t0: null, t: 0, done: false });
   $('done').hidden = true;
   people?.dispose();
-  people = new People(scene, data, level, route, params.get('day') || today, store);
+  // tonight's sky seeds everything: a horoscope cast for Tokyo at midnight on a random date (or ?chart=YYYY-MM-DD)
+  sky = tonight(params.get('day') || today, params.get('chart'));
+  people = new People(scene, data, level, route, sky, store);
   quilt?.dispose();
-  quilt = new Quilt(scene, data, level, route, params.get('day') || today, store, people, nav);
+  quilt = new Quilt(scene, data, level, route, sky, store, people, nav);
   visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
+  showFloors();
+  say([...describe(sky), ...quilt.spread()]);
+}
+
+// a portal cast with the wand: step out somewhere else, maybe on another floor
+function teleport(j) {
+  Object.assign(S, { x: j.x, z: j.z, o: j.o, ride: null, outside: false });
+  if (j.yaw !== undefined) { S.yaw = j.yaw + Math.PI; S.head = j.yaw; }
   showFloors();
 }
 
@@ -250,7 +261,11 @@ function update(dt) {
   }
   if (input.act) {
     const pn = people?.nearest(S) || quilt?.nearest(S);
-    if (pn) { say(pn.from === 'quilt' ? quilt.act(pn, S) : people.act(pn, visited.set)); applyRewards(); }
+    if (pn) {
+      say(pn.from === 'quilt' ? quilt.act(pn, S) : people.act(pn, visited.set));
+      if (quilt.jump) { teleport(quilt.jump); quilt.jump = null; }
+      applyRewards();
+    }
     else { const e = nearestEnd(); if (e) startRide(e); }
   }
   // places you've been: a lost person can only be helped to somewhere you know
@@ -280,7 +295,8 @@ function finish() {
     (S.surfaced ? `You went outside ${S.surfaced} time${S.surfaced > 1 ? 's' : ''}. It was cold.` : 'You never went outside.') +
     (people.returned ? `<br>You returned ${people.returned} thing${people.returned > 1 ? 's' : ''} to ${people.returned > 1 ? 'their owners' : 'its owner'}.` : '') +
     (people.helped ? `<br>You helped ${people.helped} ${people.helped > 1 ? 'people' : 'person'} find their way.` : '') +
-    (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '');
+    (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '') +
+    `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.`;
   void n;
 }
 
@@ -346,7 +362,10 @@ function drawMap() {
   g.stroke();
   const dot = (x, z, col, r) => { let [a, b] = P(x, z); a = Math.max(r, Math.min(W - r, a)); b = Math.max(r, Math.min(W - r, b)); g.fillStyle = col; g.fillRect(a - r, b - r, 2 * r, 2 * r); };
   if (people?.counter && people.counter.o === S.o) dot(people.counter.x, people.counter.z, '#5aa0e0', 3);
-  for (const q of quilt?.patches || []) if (q.heart.o === S.o) dot(q.heart.x, q.heart.z, '#f0ece0', 2);
+  for (const q of quilt?.patches || []) {
+    if (q.heart.o === S.o) dot(q.heart.x, q.heart.z, '#f0ece0', 2);
+    if (q.portal && q.portal.o === S.o) dot(q.portal.x, q.portal.z, '#c8a8ff', 2);
+  }
   if (quilt?.timer && quilt.timer.gate.o === S.o) dot(quilt.timer.gate.x, quilt.timer.gate.z, '#f2c81c', 3);
   if (goal.o === S.o) dot(goal.x, goal.z, '#9fe3c8', 3);
   g.fillStyle = '#f2c81c'; g.beginPath(); g.moveTo(W / 2, W / 2 - 5); g.lineTo(W / 2 - 4, W / 2 + 4); g.lineTo(W / 2 + 4, W / 2 + 4); g.fill();
@@ -464,4 +483,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };

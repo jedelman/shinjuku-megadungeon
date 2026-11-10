@@ -145,6 +145,62 @@ Publishing patches as atproto records, the way Dream publishes artifacts, would 
   announcement).
 - Props beyond vending machines, benches and carts.
 
+## The underworld: tonight's sky deals the spread (2026-11-10)
+
+Rise Up Comus posted the other half on 2026-09-02 ([Bluesky](https://bsky.app/profile/riseupcomus.bsky.social/post/3mujyw6hwx22d)):
+*His Majesty the Worm*'s Appendix E, "Generate an Underworld Layout".
+- Draw a major arcana card per dungeon.
+- The lowest card holds the main entrance.
+- Cards I–V also open to the surface, each way up "traversable and known" or "sealed and secret".
+- The highest card is the deepest level, and the rest lie between.
+- Cards connect if they lie next to each other on the table, if their values are sequential, or if one value divides
+  the other.
+- Farther from the entrances is harder and richer.
+
+**Jason's calls:**
+- "Yep, magic portals are in."
+- "Let's use astrology for seeds: horoscopes cast on a random date (location is always Tokyo midnight)."
+
+We take the procedure, with credit; never the book's text, dungeon seeds, art or the Worm.
+
+**The sky** (`src/sky.js`):
+- **The date.** Each real day draws one random date between 1900 and 2099, the same for everyone. `?chart=YYYY-MM-DD`
+  chooses one.
+- **The chart.** It's cast for 00:00 JST over Shinjuku Station (the game's origin): the Sun, Moon and five classical
+  planets, the Ascendant, tropical zodiac, whole-sign houses.
+- **The ephemeris** is our own, Paul Schlyter's low-precision method, so there's no runtime dependency.
+  `tests/sky.test.js` checks it against **astronomy-engine** (MIT, a pinned dev dependency, never shipped) over 150
+  dates: every body within 0.1°, the Ascendant on the eastern horizon.
+- **Simplifications:** JST all year (Japan's 1948–51 summer time is ignored), and no Uranus, Neptune or Pluto. The Golden
+  Dawn attributions don't need them.
+- **The chart is the seed:** its positions, hashed with the level, seed `plan()` (people) and `sew()` (patches).
+
+**The spread** (`src/arcana.js`):
+- **Attributions.** The 22 major arcana with the Golden Dawn attributions: twelve signs, seven planets, and three
+  elements (the Fool is air, the Hanged Man water, Judgement fire; the World is Saturn and earth).
+- **The draw.** Cards come in this order, keeping the first ones that differ, one per patch:
+  1. the rising sign;
+  2. the Sun's sign;
+  3. the Moon's sign;
+  4. the chart's ruler;
+  5. the element the sky leans to;
+  6. then the other planets.
+
+  Each card remembers why it was drawn and whether its point was above the horizon.
+- **The table, read off the real station:**
+  - **Depth.** A patch's depth is the mean, over its rooms, of walking distance to the nearest open exit plus that
+    exit's climb to the street. MLIT puts many exits at the foot of their stairs; the climb uses the game's 5 m a floor.
+    Shinjuku is riddled with exits, so patches are often equally deep. Ties go to the lower floor, then the deepest
+    room, then the name.
+  - **Dealing.** The lowest card goes to the shallowest patch (the way in), the highest to the deepest.
+- **Connections:**
+  - Neighbours on the table are walked: the blank's chalk stitch.
+  - The others (sequential or divisible values) are **portals** in the blanks, cast with the kitten's wand. They're
+    honest because they're plainly magic. Portals appear on about 60% of nights.
+- **Ways up.** The entrance and cards I–V get the patch's nearest open exit as their way up to the street. It's known if
+  the card's point was above the horizon (houses 7–12). If it was below, it's sealed and secret, found by walking to it.
+- **Depth pays.** The deepest patch pays twice. The deepest place is also where bosses belong, when there are bosses.
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -191,6 +247,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **2.** Lost property and runs: finds, use or return, the lost-and-found counter, the daily seed.
 - **3.** Tokyo Station area (MLIT data #2). **Done 2026-11-10 as level 1:** Higashi-Ginza → Otemachi, 2.7 km.
 - **3b. Done 2026-11-10:** patches (above): four of them, sewn daily onto every level.
+- **3c. Done 2026-11-10:** the underworld: tonight's horoscope deals a tarot spread onto the patches by real depth; wand portals.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 

@@ -6,11 +6,15 @@
 // Lost wanderers (Jason, 2026-11-10): people trying to get somewhere. You can help them only if you've been
 // to the place they're looking for.
 //
-// plan() is pure (seeded by level and date), so it can be tested; People renders and runs it.
+// plan() is pure (seeded by tonight's chart and the level), so it can be tested; People renders and runs it.
 import * as THREE from 'three';
 import { makeMaterial } from './ps1.js';
 import { FH } from './world.js';
 import { distancesTo, nearestNode } from './nav.js';
+import { rng, hash } from './seed.js';
+import { tonight, skySeed } from './sky.js';
+
+export { rng, hash };
 
 // Where the counter is. Shinjuku's is real: the Tokyo Metropolitan Government's Shinjuku terminal data marks
 // StationOffice/LostandFoundoffice at the Marunouchi line's B2 station office, 1.7 m from MLIT's office polygon.
@@ -41,21 +45,6 @@ const SAYS = [
   'Excuse me… do you know the way to', 'Sorry, I think I am lost. Where is', 'I have been walking for ages. Which way is',
 ];
 
-export function rng(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-export function hash(s) {
-  let h = 2166136261;
-  for (const c of s) h = Math.imul(h ^ c.codePointAt(0), 16777619);
-  return h >>> 0;
-}
-
 // named places a person might be looking for: gates and exits, one per name and floor
 export function places(data) {
   const m = new Map();
@@ -72,8 +61,10 @@ export function places(data) {
   }));
 }
 
+// day: a date string, or tonight's chart (the chart is the seed)
 export function plan(data, level, route, day) {
-  const r = rng(hash(`${level.id}|${day}`));
+  const sky = typeof day === 'string' ? tonight(day) : day;
+  const r = rng(skySeed(sky, `${level.id}|people`));
   const startNode = nearestNode(data, level.start.x, level.start.z, level.start.o);
   // nodes on the route there, underground, in order
   const seq = [];
@@ -146,7 +137,7 @@ function ball(r, tint, y = 0, x = 0, z = 0) {
   m.position.set(x, y, z);
   return m;
 }
-function label(text, fg, bg, w = 256, h = 64) {
+export function label(text, fg, bg, w = 256, h = 64) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const g = c.getContext('2d');

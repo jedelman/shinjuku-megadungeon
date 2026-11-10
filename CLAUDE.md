@@ -19,7 +19,8 @@ npx vite preview --port 4173 &  node tests/smoke.mjs   # headless Chromium: scre
 ```
 
 Query params for testing: `?play` skips the title, `?x=&z=&o=&yaw=` spawns anywhere (metres from
-Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns off vertex snapping.
+Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns off vertex snapping,
+`?day=YYYY-MM-DD` sets the real day, `?chart=YYYY-MM-DD` casts tonight's sky for that date instead.
 `window.__game` exposes state.
 
 ## Data and licences: these rules are not optional
@@ -96,10 +97,20 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 - `src/patches.js` + `patches/*.json`: the dungeon as a quilt, after Rise Up Comus (Joshy Mcroo), "The Elemental Level
   of Megadungeon Construction". A patch is 4–5 rooms: a heart (kernel: explore / talk / run), rooms around it, one
   blank the assembler stitches to another patch, and a gate (a real connector to another underground floor). Patches
-  name *kinds* of place, never coordinates; `sew()` is pure, seeded by level + date, and places up to four per level on
+  name *kinds* of place, never coordinates; `sew()` is pure, seeded by tonight's chart + level, and places up to four per level on
   real places within a 75 m walk. Patches are data and may come from friends: `checkPatch()` enforces the recipe and
   caps, the game escapes their text, and the content rules above apply to them. `tests/patches.test.js` checks every
   file and every level; the smoke test plays each kernel. Format: `patches/README.md`.
+- `src/sky.js` + `src/arcana.js`: **the chart is the seed.**
+  - **The sky.** Each real day draws a random date (1900–2099), and the game casts its horoscope for Tokyo at 00:00
+    JST: Sun, Moon, five planets, the Ascendant, whole-sign houses, from our own Schlyter ephemeris. `?chart=YYYY-MM-DD`
+    picks the date. `tests/sky.test.js` checks it against astronomy-engine (dev only, pinned; don't ship it).
+  - **The spread.** The chart deals major arcana (Golden Dawn attributions) to the patches by real depth (walk to an
+    exit plus its climb). The layout and connections follow His Majesty the Worm's Appendix E (Rise Up Comus): lowest
+    card = way in, highest = deepest, I–V have ways up (known above the horizon, sealed below).
+  - **Connections.** Table neighbours are walked (chalk stitches); sequential or divisible cards that aren't neighbours
+    are wand portals in the blanks. Jason: "Yep, magic portals are in."
+  - **Seeding.** `plan()` and `sew()` take a day string or a chart; both seed from `skySeed(chart, level + purpose)`.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered
