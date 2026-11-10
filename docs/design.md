@@ -15,12 +15,19 @@ links, are in `claude-memory/conversations/2026-11-10-tokyo-megadungeon.md`.
 ## Decisions (Jason, 2026-11-10)
 
 - **Roguelike.** Runs, loot, a dungeon that shifts.
-- **Lost property is useless in the dungeon.** Return it to the NPC who lost it and they'll give you
-  something useful (Jason, 2026-11-10). So every find is a small quest: carry it (it takes up space and
-  does nothing), find whose it is, get something you can actually use. Nothing is looted; things go back.
-  The station's real lost-and-found office is in the TMG data (`StationOffice/LostandFoundoffice`, B3F),
-  a natural hub for hints about who lost what. Still open: do owners wander, wait somewhere, or leave word
-  at that office?
+- **Lost property is useless in the dungeon.** Return it and the owner gives you something useful (Jason,
+  2026-11-10). **Owners leave word at the lost-and-found counter** ("consistency of return"), so every find goes
+  back to the same place. Shinjuku's counter is the real one: the Tokyo Metropolitan Government's terminal data
+  marks `StationOffice/LostandFoundoffice` at the Marunouchi line's B2 station office, and MLIT's office polygon is
+  1.7 m away. Where no data names one (Tokyo), the game puts the counter at a real MLIT station office near the
+  middle of the level and says so when you visit. **Built (v1):** four things a day per level (seeded by date), seven
+  kinds, each with an owner and the word they left. **Rewards v1, my proposal for Jason to steer:** first a lantern
+  charm (the fog lifts farther), then a folded station map (a minimap of your floor), then tiny boots (faster
+  zoomies), then stamps for your book.
+- **Lost wanderers** (Jason, 2026-11-10): "lost and wandering NPCs that you can assist if you've been to the place
+  they're trying to get to." Each one asks for a named gate or exit in the same station, reachable without
+  surfacing. Places count as visited once you pass within 8 m of them, remembered per station. If you've been
+  there, you lead them and they walk off toward it; if not, they're still asking. Three a day per level.
 - **Standalone renderer** (Jason, 2026-11-10). This is its own game with its own renderer, not a realm
   inside Dream of the Earth.
 - **Dream of the Earth links here.** A shrine in Dream links to this page. It needs a change in

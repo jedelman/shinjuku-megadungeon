@@ -115,6 +115,43 @@ console.log('finish', JSON.stringify(done));
 if (!done.done) errors.push('finishing the level failed');
 
 
+// people: pick up a lost thing, return it at the counter, listen to a lost person before and after visiting their place
+await page.goto(base + '?play');
+await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+await page.evaluate(() => localStorage.clear());
+await page.goto(base + '?play&day=2026-11-10');
+await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+const said = () => page.evaluate(() => document.getElementById('say').textContent);
+const it0 = await page.evaluate(() => { const g = window.__game, it = g.people.items[0]; g.S.x = it.x; g.S.z = it.z; g.S.o = it.o; return it.ja; });
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${out}/people-item.png` });
+await page.keyboard.press('KeyE'); await page.waitForTimeout(300);
+const s1 = await said();
+const bag = await page.evaluate(() => window.__game.people.bag.length);
+console.log('pickup', it0, JSON.stringify({ bag, said: s1.slice(0, 80) }));
+if (bag !== 1) errors.push('picking up lost property failed');
+await page.evaluate(() => { const g = window.__game, c = g.people.counter; g.S.x = c.x + 0.8; g.S.z = c.z; g.S.o = c.o; g.S.yaw = Math.PI / 2; });
+await page.waitForTimeout(800);
+await page.screenshot({ path: `${out}/people-counter.png` });
+await page.keyboard.press('KeyE'); await page.waitForTimeout(300);
+const s2 = await said();
+const rw = await page.evaluate(() => window.__game.store.data.rewards);
+console.log('return', JSON.stringify({ rewards: rw, said: s2.slice(0, 120) }));
+if (!rw.includes('lantern')) errors.push('returning lost property gave no reward');
+const w0 = await page.evaluate(() => { const g = window.__game, w = g.people.wanderers[0]; g.S.x = w.x + 1.2; g.S.z = w.z; g.S.o = w.o; g.S.yaw = Math.PI / 2; return w.dest.name; });
+await page.waitForTimeout(800);
+await page.screenshot({ path: `${out}/people-wanderer.png` });
+await page.keyboard.press('KeyE'); await page.waitForTimeout(300);
+const s3 = await said();
+await page.evaluate(() => { const g = window.__game; g.visited.add(g.people.wanderers[0].dest.key); });
+await page.keyboard.press('KeyE'); await page.waitForTimeout(300);
+const s4 = await said();
+const led = await page.evaluate(() => window.__game.people.wanderers[0].state);
+console.log('wanderer', w0, JSON.stringify({ before: s3.slice(-40), after: s4.slice(-60), state: led }));
+if (!s3.includes("haven't been") || led !== 'led') errors.push('helping a lost person failed');
+await page.waitForTimeout(2500);
+await page.screenshot({ path: `${out}/people-led.png` });
+
 // Tokyo: choose it on the title with the keyboard, then visit the route and finish it
 await page.goto(base);
 await page.waitForFunction(() => window.__game && document.getElementById('loading').hidden);
