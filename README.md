@@ -34,6 +34,11 @@ Comus's *His Majesty the Worm*: the lowest card is the way in, the highest is th
 exits), and cards I–V have ways up to the street, sealed if their card was below the horizon. Cards that connect but
 aren't neighbours open portals, cast with the kitten's wand.
 
+A chart makes the patch: each patch is placed by the horoscope of its own night, so it has an address, like
+`the-last-shutter@1927-12-30`, that always gives the same patch. Step into it and you're in that night: its date on the
+HUD, its season's light, and cherry petals, fireflies, osmanthus, ginkgo or snow drifting down the corridor. The finish
+card links tonight's patches; `?patches=a@d,b@d` replays any.
+
 ## Play
 
 - **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.

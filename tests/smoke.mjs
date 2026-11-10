@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 // playwright is installed globally in the cloud sandbox; require() finds it from anywhere
 const { chromium } = createRequire(import.meta.url)('playwright');
 import fs from 'node:fs';
+import { longDate } from '../src/sky.js';
 
 const base = process.argv[2] || 'http://localhost:4173/';
 const out = process.argv[3] || 'smoke-out';
@@ -220,29 +221,49 @@ const ad = await page.evaluate(() => ({ done: window.__game.S.done, text: docume
 console.log('astra finish', JSON.stringify(ad));
 if (!ad.done) errors.push("finishing Astra's route failed");
 
-// The quilt (patches after Rise Up Comus) under a chosen sky: the chart for 1927-12-30 (the day Tokyo's first subway
-// opened) deals level 0 two portals and a sealed way up. Walk every patch, play each kernel, cast, look at a few.
-await page.goto(base + '?level=0&play&day=2026-11-10&chart=1927-12-30');
+// The quilt (patches after Rise Up Comus), replayed by address: a chart makes the patch. Four exact patches under the
+// sky of 1988-08-08, which deals I The Magician (two portals: I divides everything) and a sealed way up.
+const NIGHT = 'chart=1988-08-08&patches=the-vending-machine-choir@2053-08-02,three-chalk-cats@2077-01-28,the-last-shutter@2066-03-19,the-man-who-still-commutes@1979-08-18';
+await page.goto(base + `?level=0&play&day=2026-11-10&${NIGHT}`);
 await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.quilt);
 const skyText = await page.evaluate(() => document.getElementById('say').textContent);
 console.log('sky', JSON.stringify(skyText));
-if (!/cast for Tokyo at midnight on 30 December 1927/.test(skyText) || !/The spread:/.test(skyText)) errors.push(`no sky or spread at the start (${skyText})`);
+if (!/cast for Tokyo at midnight on 8 August 1988/.test(skyText) || !/The spread:/.test(skyText)) errors.push(`no sky or spread at the start (${skyText})`);
 const quilt = await page.evaluate(() => window.__game.quilt.patches.map((q) => ({
   id: q.id, kernel: q.kernel, name: q.name, px: q.px, pz: q.pz, place: q.place, card: q.card.n,
   portal: q.portal ? { x: q.portal.x, z: q.portal.z, o: q.portal.o } : null, portals: q.portals.map((l) => l.to),
-  surface: q.surface,
+  surface: q.surface, address: q.address, date: q.date,
   rooms: q.rooms.map((r) => ({ role: r.role, x: r.x, z: r.z, o: r.o, prop: r.def.prop || null, propAt: r.propAt || null })),
 })));
 const props = await page.evaluate(() => { const q = window.__game.quilt; return [q.props, q.patches.reduce((n, x) => n + x.rooms.filter((r) => r.def.prop).length, 0)]; });
 if (props[0] !== props[1]) errors.push(`placed ${props[0]} of ${props[1]} props`);
 console.log('quilt', JSON.stringify(quilt.map((q) => `${q.name} (${q.kernel})`)));
 if (quilt.length < 3) errors.push(`only ${quilt.length} patches sewn on level 0`);
+const want = NIGHT.split('patches=')[1].split(',');
+if (quilt.map((q) => q.address).sort().join() !== [...want].sort().join()) errors.push(`?patches= didn't replay the addresses (${quilt.map((q) => q.address)})`);
 const goTo = async (r) => {
   await page.evaluate(({ x, z, o }) => { const g = window.__game; Object.assign(g.S, { x, z, o }); }, r);
   await page.waitForTimeout(450);
   return page.evaluate(() => document.getElementById('say').textContent);
 };
 const away = { x: 28.81, z: -426.74, o: -2 };
+// a sealed way up is found by walking to it (first, before other walks pass near it)
+for (const q of quilt.filter((q) => q.surface && !q.surface.known)) {
+  await goTo(away);
+  const said = await goTo({ x: q.surface.x, z: q.surface.z, o: q.surface.o });
+  const found = await page.evaluate((id) => window.__game.quilt.patches.find((p) => p.id === id).surface.found === true, q.id);
+  console.log('secret way up', q.name, found, JSON.stringify(said.slice(0, 100)));
+  if (!found || !/A sealed way up, found: exit/.test(said)) errors.push(`${q.name}: walking to its sealed way up found nothing (${said})`);
+}
+// the time warp: inside a patch you're in its night, with its date on the HUD and its season drifting down
+for (const q of quilt) {
+  await goTo(away);
+  await goTo(q.rooms.find((r) => r.role === 'heart'));
+  await page.waitForTimeout(150);
+  const w = await page.evaluate(() => { const g = window.__game; return { where: document.getElementById('where').textContent, zone: g.quilt.zone?.address, kind: g.quilt.zone?.warp.kind, drifting: g.quilt.zone?.warp.pts.visible }; });
+  console.log('warp', q.address, JSON.stringify(w));
+  if (w.zone !== q.address || !w.where.includes(longDate(q.date)) || !w.drifting) errors.push(`${q.name}: no time warp inside it (${JSON.stringify(w)})`);
+}
 for (const q of quilt) {
   const heart = q.rooms.find((r) => r.role === 'heart');
   const gate = q.rooms.find((r) => r.role === 'gate');
@@ -267,8 +288,9 @@ for (const q of quilt) {
     if (!/There's|Nothing dropped/.test(said)) errors.push(`${q.name}: listening gave no hint (${said})`);
   }
   const stamps1 = await page.evaluate(() => window.__game.store.data.stamps);
-  const pay = q.place === 'deepest' ? 2 : 1;   // the deepest patch tonight pays twice
-  if (q.kernel !== 'talk' && stamps1 !== stamps0 + pay) errors.push(`${q.name}: expected ${pay} stamp(s) for its ${q.kernel}, got ${stamps1 - stamps0} (${said})`);
+  // the deepest patch tonight pays twice (its talker too); other talkers give a hint, not a stamp
+  const pay = q.place === 'deepest' ? 2 : q.kernel === 'talk' ? 0 : 1;
+  if (stamps1 !== stamps0 + pay) errors.push(`${q.name}: expected ${pay} stamp(s) for its ${q.kernel}, got ${stamps1 - stamps0} (${said})`);
   const blank = await goTo(q.rooms.find((r) => r.role === 'blank'));
   if (!/Chalked on the floor/.test(blank)) errors.push(`${q.name}: the blank has no stitch (${blank})`);
   else if (!quilt.some((o) => o !== q && blank.includes(`"${o.name}"`))) errors.push(`${q.name}: the stitch doesn't name a patch (${blank})`);
@@ -280,7 +302,7 @@ if (walked.length !== quilt.length) errors.push(`walked ${walked.length} of ${qu
 
 // cast every portal with the wand: you step out beside the other patch's ring, on its floor
 const portaled = quilt.filter((q) => q.portal);
-if (!portaled.length) errors.push('no portals under the 1927-12-30 sky');
+if (!portaled.length) errors.push('no portals under the 1988-08-08 sky');
 for (const q of portaled) {
   await goTo(away);
   await goTo(q.portal);
@@ -296,13 +318,7 @@ for (const q of portaled) {
   if (!/raise your wand/.test(after.said)) errors.push(`${q.name}: casting said nothing (${after.said})`);
 }
 
-// a sealed way up is found by walking to it
-for (const q of quilt.filter((q) => q.surface && !q.surface.known)) {
-  await goTo(away);
-  const said = await goTo({ x: q.surface.x, z: q.surface.z, o: q.surface.o });
-  console.log('secret way up', q.name, JSON.stringify(said.slice(0, 100)));
-  if (!/A sealed way up, found: exit/.test(said)) errors.push(`${q.name}: walking to its sealed way up found nothing (${said})`);
-}
+
 // stand back from a vending machine and look at it
 const vm = quilt.flatMap((q) => q.rooms.filter((r) => r.prop === 'vending' && r.propAt))[0];
 let pr = null;
@@ -312,9 +328,10 @@ if (vm) {
 }
 const pq = portaled[0];
 const pv = pq && { x: pq.portal.x + 2.4, z: pq.portal.z, o: pq.portal.o, yaw: Math.PI / 2 };   // the kitten faces yaw + π: west, at the ring
-for (const [name, r] of [['quilt-portal', pv], ['quilt-prop', pr], ['quilt-talk', quilt.find((q) => q.kernel === 'talk') && { x: quilt.find((q) => q.kernel === 'talk').px + 2.5, z: quilt.find((q) => q.kernel === 'talk').pz, o: quilt.find((q) => q.kernel === 'talk').rooms[0].o }]]) {
+const heartOf = (id) => { const q = quilt.find((x) => x.id === id); const h = q && q.rooms.find((r) => r.role === 'heart'); return h && { x: h.x + 2.2, z: h.z, o: h.o, yaw: Math.PI / 2 }; };
+for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sakura', heartOf('the-last-shutter')], ['quilt-portal', pv], ['quilt-prop', pr], ['quilt-talk', quilt.find((q) => q.kernel === 'talk') && { x: quilt.find((q) => q.kernel === 'talk').px + 2.5, z: quilt.find((q) => q.kernel === 'talk').pz, o: quilt.find((q) => q.kernel === 'talk').rooms[0].o }]]) {
   if (!r) continue;
-  await page.goto(base + `?level=0&play&day=2026-11-10&chart=1927-12-30&x=${r.x}&z=${r.z}&o=${r.o}${r.yaw !== undefined ? `&yaw=${r.yaw}` : ''}`);
+  await page.goto(base + `?level=0&play&day=2026-11-10&${NIGHT}&x=${r.x}&z=${r.z}&o=${r.o}${r.yaw !== undefined ? `&yaw=${r.yaw}` : ''}`);
   await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
   await page.waitForTimeout(1800);
   await page.screenshot({ path: `${out}/${name}.png` });

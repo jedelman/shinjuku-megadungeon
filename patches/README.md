@@ -14,6 +14,8 @@ Here a **room** is a real place in the station: a ticket gate, an exit, a statio
 places within a 75 m walk of each other on one floor. Its **gate** is a real stair, escalator or lift to another
 underground floor. You write a patch against *kinds* of place, never coordinates, so it sews into Shinjuku, Tokyo or
 any station we add. Each day the game sews up to four patches onto each level, somewhere new (`src/patches.js`, `sew()`).
+Where a patch lies is decided by the horoscope of its own night, so `your-patch@1964-10-10` is an address: open the game
+with `?patches=your-patch@1964-10-10` to walk exactly that patch again. That's how to test yours.
 
 ## The format
 

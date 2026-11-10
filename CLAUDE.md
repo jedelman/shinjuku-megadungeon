@@ -20,7 +20,8 @@ npx vite preview --port 4173 &  node tests/smoke.mjs   # headless Chromium: scre
 
 Query params for testing: `?play` skips the title, `?x=&z=&o=&yaw=` spawns anywhere (metres from
 Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns off vertex snapping,
-`?day=YYYY-MM-DD` sets the real day, `?chart=YYYY-MM-DD` casts tonight's sky for that date instead.
+`?day=YYYY-MM-DD` sets the real day, `?chart=YYYY-MM-DD` casts tonight's sky for that date instead,
+`?patches=id@YYYY-MM-DD,...` replays exact patches.
 `window.__game` exposes state.
 
 ## Data and licences: these rules are not optional
@@ -82,7 +83,9 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   `src/world.js` builds per-floor meshes (long triangles are split so affine texturing holds up).
   `src/main.js` runs the loop, camera, rides, the outside rule and the HUD. `src/input.js` handles keys,
   gamepad and touch.
-- `src/kitten.js`: the player. Rigid segments on named joints (PS1-style, no skin), animated by **three's
+- `src/kitten.js`: the player, with mofusand-like *proportions* (Jason, 2026-11-10): a big round head, big low-set eyes,
+  a round body on stubby legs. Only the proportions: her coat, pack and wand are her own; don't copy a mofusand
+  character. Rigid segments on named joints (PS1-style, no skin), animated by **three's
   `AnimationMixer`** with clips authored in code: idle, sit, walk, trot, gallop, hop. Gaits are weighted by
   speed and phase-locked; the cycle advances by distance over stride length, so paws plant. New clips go in
   `makeClips()`; `tests/kitten.test.js` fails if a track names a joint that doesn't exist. **Not R3F:** R3F is
@@ -111,6 +114,11 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   - **Connections.** Table neighbours are walked (chalk stitches); sequential or divisible cards that aren't neighbours
     are wand portals in the blanks. Jason: "Yep, magic portals are in."
   - **Seeding.** `plan()` and `sew()` take a day string or a chart; both seed from `skySeed(chart, level + purpose)`.
+  - **A chart makes the patch.** `placePatch(ctx, patch, date, station)` places a patch from its own date's chart and
+    nothing else, so `id@YYYY-MM-DD` is an address: `?patches=a@d,b@d` replays exact patches (the finish card links
+    tonight's), and tests pin addresses. Tonight's sky picks each patch's date (redrawing until it lies clear) and still
+    deals the cards. Inside a patch you're in its night: its date on the HUD, its season's fog, and its season drifting
+    down (petals, fireflies, osmanthus, ginkgo, snow).
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered

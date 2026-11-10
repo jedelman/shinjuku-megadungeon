@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeKitten } from '../src/kitten.js';
+import { makeKitten, BODY_Y } from '../src/kitten.js';
 
 describe('kitten animation', () => {
   const k = makeKitten();
@@ -37,6 +37,6 @@ describe('kitten animation', () => {
   it('sits down after a few idle seconds', () => {
     const body = k.root.getObjectByName('body');
     for (let i = 0; i < 60 * 7; i++) k.animate(1 / 60, 0, null);
-    expect(body.position.y).toBeLessThan(0.1); // sitting lowers the body
+    expect(body.position.y).toBeLessThan(BODY_Y - 0.01); // sitting lowers the body
   });
 });
