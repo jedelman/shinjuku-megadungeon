@@ -172,7 +172,7 @@ export function distancesTo(world, goal, { underground = true } = {}) {
   return { dist, next };
 }
 
-class MinHeap {
+export class MinHeap {
   constructor() { this.k = []; this.v = []; }
   get size() { return this.k.length; }
   push(key, val) {
