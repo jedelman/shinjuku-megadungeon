@@ -8,14 +8,19 @@ It started from one question on Bluesky ([@astrra.space](https://bsky.app/profil
 
 > it's cold outside today. i wonder if you can walk all the way from shinjuku-sanchome to nishishinjuku only using underground passages (so, no trains and no going outside)
 
+You're a kitten, 30 cm tall, with a backpack and a magic wand. At that size the station is about six
+times bigger than it is for everyone else.
+
 That's the rule here. **Level 0:** from the foot of the Seibu Shinjuku stairs on B2 to the Keio New Line
 gate on B1, about 1.1 km, without going up to the street.
 
 ## Play
 
-- **Keyboard:** WASD or arrows to walk, Shift to run, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
-- **Gamepad:** left stick to walk, right stick to look, Ⓐ to take stairs, Ⓑ / RT to run, Start to restart.
+- **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
+- **Gamepad:** left stick to walk, right stick to look, Ⓐ to take stairs, Ⓑ / RT for zoomies, Start to restart.
 - **Phone:** play in landscape. Left thumb walks, right thumb looks, and a ▲▼ button appears at stairs.
+
+Live: https://shinjuku-megadungeon.jason-edelman.org
 
 ## Run it
 

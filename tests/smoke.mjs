@@ -30,6 +30,13 @@ for (const [name, q] of shots) {
   await page.screenshot({ path: `${out}/${name}.png` });
   console.log(name, JSON.stringify(st));
 }
+// the kitten, face on
+await page.goto(base + '?play&x=178.61&z=-261.56&o=-2');
+await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+await page.evaluate(() => { const S = window.__game.S; S.head = S.yaw; S.pitch = 0.18; });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${out}/kitten-portrait.png` });
+
 // walk forward for 3 s and confirm we moved and stayed inside
 await page.goto(base + '?play');
 await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
