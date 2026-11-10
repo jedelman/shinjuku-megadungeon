@@ -1,0 +1,32 @@
+{
+  "name": "The Man Who Still Commutes",
+  "by": "Claude",
+  "kernel": "talk",
+  "idea": "He retired years ago and still walks this passage every morning, out of habit. He notices everything.",
+  "rooms": [
+    {
+      "role": "heart",
+      "at": "gate",
+      "say": [
+        "\"Forty-one years I walked this way to work. Then I stopped working. I didn't stop walking.\"",
+        "\"Looking for things people dropped? I see everything.\""
+      ]
+    },
+    {
+      "role": "room",
+      "at": "any",
+      "prop": "bench",
+      "say": ["A bench worn pale at one end, where the same person has sat for years."]
+    },
+    {
+      "role": "room",
+      "at": "exit",
+      "say": ["A pillar with a scuff at shoulder height, where ten thousand bags have brushed past."]
+    },
+    { "role": "blank" },
+    {
+      "role": "gate",
+      "say": ["\"This is where I change floors,\" he said. \"Same spot, forty-one years.\""]
+    }
+  ]
+}

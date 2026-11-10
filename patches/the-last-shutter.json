@@ -1,0 +1,39 @@
+{
+  "name": "The Last Shutter",
+  "by": "Claude",
+  "kernel": "run",
+  "idea": "Closing time. The shutters along this stretch are coming down, and the only way on is the way to another floor.",
+  "rooms": [
+    {
+      "role": "heart",
+      "at": "any",
+      "say": [
+        "A chime, then the whine of motors. Down the passage, shop shutters start to lower, one after another."
+      ],
+      "found": [
+        "Under the last shutter with a whisker to spare.",
+        "Someone behind it claps. A station stamp for your book, for nerve."
+      ],
+      "missed": [
+        "The last shutter is down.",
+        "A night cleaner lifts it a hand's width, just enough for a kitten, and waves you through. Next time."
+      ]
+    },
+    {
+      "role": "room",
+      "at": "exit",
+      "say": ["A shutter already down. Taped to it, a paper sign: 本日の営業は終了しました. Business is over for today."]
+    },
+    {
+      "role": "room",
+      "at": "any",
+      "prop": "cart",
+      "say": ["A cleaner's cart, left mid-mop. The floor shines and smells of lemons."]
+    },
+    { "role": "blank" },
+    {
+      "role": "gate",
+      "say": ["The shutters stop short of here. They always have."]
+    }
+  ]
+}

@@ -83,6 +83,68 @@ fixed; hoardings, closures and loot move with the daily seed. Real closures alre
 That is the roguelike, and it's true to the place. The MLIT map is itself a 2016–2020 snapshot of a
 station that has since been torn up: the old map is literally out of date.
 
+## Patches: the dungeon as a quilt (after Rise Up Comus, 2026-11-10)
+
+Jason (2026-11-10): "Joshy Mcroo is an incredible resource on megadungeons. Let's take some of his advice." The advice
+is his challenge, ["The Elemental Level of Megadungeon Construction"](https://riseupcomus.blogspot.com/2026/09/the-elemental-level-of-megadungeon.html)
+(Rise Up Comus, 2026-09-03; [on Bluesky](https://bsky.app/profile/riseupcomus.bsky.social/post/3mumgdofhl22k)):
+write megadungeons in 4–5 room "elemental building blocks", or patches.
+- Start with a kernel: a reason to explore, to talk, to run away.
+- Build 2–3 rooms around it.
+- Connect an intentionally blank room for the assembler to fill.
+- Put a gate that connects to another level.
+- Give it an evocative name.
+- Trade patches with friends: "Make your megadungeons like a quilt."
+
+**How it maps onto a real station.** We can't draw rooms: the geometry is MLIT's, and it's fixed. So:
+- A **room** is a real named place: a ticket gate, an exit, a station office.
+- A **patch** is a cluster of them within a 75 m walk on one floor.
+- Its **gate** is a real stair, escalator or lift to another underground floor. Floors are the dungeon's levels.
+
+The station already has the structure the post quotes from Gus's Jaquaysing article (nodes, choke points, alternate ways down). Patches only key it.
+
+**Patches are portable.** A patch is written against *kinds* of place (`at`: gate / exit / office / any), never
+coordinates, so the same file sews into Shinjuku, Tokyo or Astra's route. `sew()` places up to four a day per level,
+seeded like the people:
+- Hearts are at least 60 m apart.
+- No place belongs to two patches.
+- Every room is walkable and reachable without surfacing.
+- A patch that doesn't fit today is left out.
+
+As one commenter on the post (ratkingrpg) pointed out, these are keyed spaces, not five-room adventures: rooms have
+no required order.
+
+**The kernels are engine code; the patches are data** (`patches/*.json`, one file each, `patches/README.md`):
+- `explore`: find every room, then the heart gives up its find.
+- `talk`: a person at the heart who also tells you where today's nearest lost thing is. This ties patches to the
+  lost-property loop the way his Meatgrinder ties a level together.
+- `run`: a clock from the heart to the gate.
+
+Finds are station stamps for now. The **blank** is filled with a stitch, a chalked arrow naming the next patch in the
+day's quilt and its walking distance. A lone patch's stitch points at the lost-and-found.
+
+**Friends' patches are untrusted input.** A friend's patch is a pull request with one JSON file:
+- It's checked against hard caps (`checkPatch`: 4–5 rooms, exactly one heart and one blank, a gate, lines ≤ 160
+  characters).
+- Its text is escaped.
+- The content rules still hold.
+
+Publishing patches as atproto records, the way Dream publishes artifacts, would be the Bluesky-native version of
+"post your patches on your blog". That's Jason's call (it's shared state), and it isn't built.
+
+**The first month** (his "a patch a week for a month"):
+- *The Last Shutter* (run)
+- *Three Chalk Cats* (explore)
+- *The Man Who Still Commutes* (talk)
+- *The Vending Machine Choir* (explore)
+
+**Not yet:**
+- His other blank fillers: a lever that opens a door elsewhere, or an idol that wants gems from another level. These
+  need locks and an inventory beyond the lost-property bag.
+- A Meatgrinder: an overloaded encounter table per level (the rush-hour surge, the cleaning machine, the
+  announcement).
+- Props beyond vending machines, benches and carts.
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -128,6 +190,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
   verify kira's "A17 dead-ends" claim against the data. Use PLATEAU's elevations for true floor depths.
 - **2.** Lost property and runs: finds, use or return, the lost-and-found counter, the daily seed.
 - **3.** Tokyo Station area (MLIT data #2). **Done 2026-11-10 as level 1:** Higashi-Ginza → Otemachi, 2.7 km.
+- **3b. Done 2026-11-10:** patches (above): four of them, sewn daily onto every level.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound** throughout: original departure melodies, rooms with their own hum.
 

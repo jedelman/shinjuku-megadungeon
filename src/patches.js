@@ -1,0 +1,419 @@
+// Patches: the dungeon written in 4–5 room elemental building blocks and sewn onto the real station like a quilt.
+//
+// After Rise Up Comus (Joshy Mcroo), "The Elemental Level of Megadungeon Construction" (2026-09-03,
+// https://riseupcomus.blogspot.com/2026/09/the-elemental-level-of-megadungeon.html): start with a kernel (a reason
+// to explore, a reason to talk, a reason to run away), build 2–3 rooms around it, connect an intentionally blank
+// room for the assembler to fill, put a gate that connects to another level, and give it an evocative name.
+// "Make your megadungeons like a quilt."
+//
+// Here a room is a real place in the station (a ticket gate, an exit, a station office), a patch is a cluster of
+// them a short walk apart, and its gate is a real stair, escalator or lift to another floor. Patches are written
+// against kinds of place, never coordinates, so one patch sews into any station. They're data (patches/*.json),
+// so a friend's patch is a file, checked against hard caps like any untrusted input. sew() is pure and seeded by
+// level and date, like the people; Quilt renders it and runs the kernels.
+import * as THREE from 'three';
+import { FH } from './world.js';
+import { nearestNode, FloorNav, floorKey } from './nav.js';
+import { places, rng, hash, box, makePerson } from './people.js';
+
+export const KERNELS = ['explore', 'talk', 'run'];
+const ROLES = ['heart', 'room', 'blank', 'gate'];
+const AT = ['gate', 'exit', 'office', 'any'];
+const LINE = 160, LINES = 4;
+const PROPS = ['vending', 'bench', 'cart'];
+
+// what's wrong with a patch, as a list ([] means it's fine). Caps hold for anyone's patch.
+export function checkPatch(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return ['a patch is an object'];
+  const bad = [];
+  const str = (s, max) => typeof s === 'string' && s.trim().length > 0 && s.length <= max;
+  const lines = (a, what, need) => {
+    if (a === undefined) { if (need) bad.push(`${what}: required`); return; }
+    if (!Array.isArray(a) || !a.length || a.length > LINES || !a.every((l) => str(l, LINE))) bad.push(`${what}: 1 to ${LINES} lines of up to ${LINE} characters`);
+  };
+  if (!str(p.name, 60)) bad.push('name: an evocative name, up to 60 characters');
+  if (!str(p.by, 80)) bad.push('by: who wrote it');
+  if (!KERNELS.includes(p.kernel)) bad.push(`kernel: one of ${KERNELS.join(', ')}`);
+  if (!str(p.idea, 200)) bad.push('idea: the kernel in a sentence, up to 200 characters');
+  const rooms = Array.isArray(p.rooms) ? p.rooms : [];
+  if (rooms.length < 4 || rooms.length > 5) bad.push('rooms: 4 or 5 of them');
+  const n = (role) => rooms.filter((r) => r && r.role === role).length;
+  if (n('heart') !== 1) bad.push('rooms: exactly one heart, where the kernel lives');
+  if (n('room') < 1) bad.push('rooms: at least one room around the heart');
+  if (n('blank') !== 1) bad.push('rooms: exactly one blank, left for the assembler');
+  if (n('gate') < 1 || n('gate') > 2) bad.push('rooms: one or two gates to another floor');
+  rooms.forEach((r, i) => {
+    const what = `rooms[${i}]`;
+    if (!r || typeof r !== 'object' || !ROLES.includes(r.role)) { bad.push(`${what}: role is one of ${ROLES.join(', ')}`); return; }
+    if (r.at !== undefined && !AT.includes(r.at)) bad.push(`${what}.at: one of ${AT.join(', ')}`);
+    if (r.prop !== undefined && !PROPS.includes(r.prop)) bad.push(`${what}.prop: one of ${PROPS.join(', ')}`);
+    if (r.role === 'blank') {
+      if (r.say || r.prop) bad.push(`${what}: a blank stays blank (the assembler fills it)`);
+      return;
+    }
+    lines(r.say, `${what}.say`, true);
+    if (r.role === 'heart') {
+      lines(r.found, `${what}.found`, p.kernel === 'explore' || p.kernel === 'run');
+      lines(r.missed, `${what}.missed`, p.kernel === 'run');
+      lines(r.then, `${what}.then`, false);
+    }
+  });
+  return bad;
+}
+
+// the quilt's own patches, one file each
+const files = import.meta.glob('../patches/*.json', { eager: true, import: 'default' });
+export const PATCH_FILES = Object.entries(files).map(([path, p]) => ({ file: path.split('/').pop(), patch: p }));
+export const PATCHES = PATCH_FILES.filter(({ file, patch }) => {
+  const bad = checkPatch(patch);
+  if (bad.length) console.warn(`patch ${file} left out:`, bad.join('; '));
+  return !bad.length;
+}).map(({ file, patch }) => ({ id: file.replace(/\.json$/, ''), ...patch }));
+
+const NODE = 75;    // a patch's rooms lie within this walk of its heart
+const APART = 60;   // hearts of different patches at least this far apart
+const ROOMS_APART = 8;
+const KIND = { 4: 'Lift', 5: 'Escalator', 6: 'Stairs', 7: 'Slope' };
+const floorName = (o) => (o < 0 ? `B${-o}F` : o === 0 ? 'Street' : `${o}F`);
+
+// network adjacency, built once per station
+const ADJ = new WeakMap();
+function adjacency(data) {
+  if (!ADJ.has(data)) {
+    const adj = Array.from({ length: data.nodes.length }, () => []);
+    for (const [a, b, t, d] of data.links) { const w = t === 4 ? 8 : d; adj[a].push([b, w]); adj[b].push([a, w]); }
+    ADJ.set(data, adj);
+  }
+  return ADJ.get(data);
+}
+// walking distances from one node, underground only, out to max metres
+export function around(data, src, max) {
+  const adj = adjacency(data);
+  const dist = new Map([[src, 0]]);
+  const open = [[0, src]];
+  while (open.length) {
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (open[i][0] < open[bi][0]) bi = i;
+    const [d, u] = open.splice(bi, 1)[0];
+    if (d > dist.get(u)) continue;
+    for (const [v, w] of adj[u]) {
+      const nd = d + w;
+      if (nd > max || data.nodes[v][2] >= 0) continue;
+      if (nd < (dist.get(v) ?? Infinity)) { dist.set(v, nd); open.push([nd, v]); }
+    }
+  }
+  return dist;
+}
+
+// Sew the day's patches onto the station: each heart on a real place of the kind it asks for, its rooms on other
+// real places within a short walk on the same floor, its gate on a real connector to another underground floor,
+// everything reachable from the level's route without surfacing. Patches that don't fit today are left out.
+export function sew(data, level, route, day, patches = PATCHES, { max = 4, counter = null } = {}) {
+  const r = rng(hash(`${level.id}|${day}|quilt`));
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const navs = new Map();
+  const walkable = (k) => {
+    const o = data.nodes[k][2], key = floorKey(o);
+    if (!navs.has(key)) navs.set(key, data.floors[key] ? new FloorNav(data.floors[key]) : null);
+    return navs.get(key)?.inside(data.nodes[k][0], data.nodes[k][1]) ?? false;
+  };
+  // a room sits on a network node that's underground, on the walkable floor, and reachable from the route
+  const ok = (k) => k >= 0 && data.nodes[k][2] < 0 && Number.isFinite(route.dist[k]) && walkable(k);
+
+  const spots = places(data).filter((p) => p.o < 0);
+  for (const f of data.offices) if (f.o < 0) spots.push({ key: `office@${Math.round(f.x)},${Math.round(f.z)},${f.o}`, name: 'a station office', kind: 'office', x: f.x, z: f.z, o: f.o });
+  for (const s of spots) {
+    s.node = nearestNode(data, s.x, s.z, s.o, 25);
+    if (s.node >= 0) [s.x, s.z] = data.nodes[s.node];   // from here on a room is where its node is
+  }
+  const usable = spots.filter((s) => ok(s.node));
+  const ends = [];
+  data.conns.forEach((c, ci) => {
+    for (const [h, t] of [[c.a, c.b], [c.b, c.a]]) {
+      if (ok(h) && t >= 0 && data.nodes[t][2] < 0 && Number.isFinite(route.dist[t]) && data.nodes[t][2] !== data.nodes[h][2]) ends.push({ node: h, to: data.nodes[t][2], t: c.t, conn: ci, key: `conn${ci}@${h}` });
+    }
+  });
+  const fits = (s, at) => !at || at === 'any' || s.kind === at;
+  const at = (k) => ({ x: data.nodes[k][0], z: data.nodes[k][1], o: data.nodes[k][2], node: k });
+
+  // greedy placement can strand the last patch, so try a few seeded orders and keep the fullest quilt
+  let out = [];
+  const want = Math.min(max, patches.length);
+  for (let tries = 0; tries < 6 && out.length < want; tries++) {
+    const got = place();
+    if (got.length > out.length) out = got;
+  }
+  function place() {
+  const taken = new Set();
+  const out = [];
+  for (const P of shuffle([...patches])) {
+    if (out.length >= max) break;
+    const defs = P.rooms;
+    const hd = defs.find((d) => d.role === 'heart');
+    for (const h of shuffle(usable.filter((s) => fits(s, hd.at) && !taken.has(s.key)))) {
+      if (out.some((q) => Math.hypot(q.heart.x - h.x, q.heart.z - h.z) < APART)) continue;
+      const near = around(data, h.node, NODE * 1.4);
+      const used = [h];
+      const far = (s) => used.every((u) => Math.hypot(u.x - s.x, u.z - s.z) >= ROOMS_APART && u.node !== s.node);
+      const rooms = [];
+      let failed = false;
+      for (const d of defs) {
+        let spot;
+        if (d.role === 'heart') spot = h;
+        else if (d.role === 'gate') {
+          spot = shuffle(ends.filter((e) => data.nodes[e.node][2] === h.o && near.has(e.node) && !taken.has(e.key) && far(at(e.node))))[0];
+          if (spot) spot = { ...spot, ...at(spot.node), name: `${KIND[spot.t] || 'Stairs'} to ${floorName(spot.to)}`, kind: 'conn' };
+        } else {
+          spot = shuffle(usable.filter((s) => s.o === h.o && fits(s, d.at) && !taken.has(s.key) && (near.get(s.node) ?? Infinity) <= NODE && far(s)))[0];
+        }
+        if (!spot) { failed = true; break; }
+        used.push(spot);
+        rooms.push({ role: d.role, def: d, name: spot.name, kind: spot.kind, key: spot.key, ...at(spot.node), ...(d.role === 'gate' ? { to: spot.to, t: spot.t } : {}) });
+      }
+      if (failed) continue;
+      for (const u of used) taken.add(u.key);
+      out.push({ id: P.id, name: P.name, by: P.by, kernel: P.kernel, idea: P.idea, rooms, heart: rooms.find((x) => x.role === 'heart') });
+      break;
+    }
+  }
+  return out;
+  }
+
+  // fill the blanks: each one stitches its patch to the next patch in the quilt (or, alone, to the lost-and-found)
+  for (const [i, q] of out.entries()) {
+    const b = q.rooms.find((x) => x.role === 'blank');
+    const other = out.length > 1 ? out[(i + 1) % out.length] : null;
+    const target = other ? { name: other.name, ...other.heart } : counter ? { name: '忘れ物取扱所 (lost and found)', x: counter.x, z: counter.z, o: counter.o, node: nearestNode(data, counter.x, counter.z, counter.o, 40) } : null;
+    if (target && target.node >= 0) {
+      const m = Math.round(around(data, target.node, 4000).get(b.node) ?? NaN);
+      if (Number.isFinite(m)) { b.stitch = { name: target.name, m, o: target.o }; continue; }
+    }
+    b.stitch = null;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------- rendering
+
+// chalk marks on the floor, one per role, so a patch reads as a patch from a few metres off
+function chalk(role) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(240,236,224,0.9)'; g.lineWidth = 4; g.lineCap = 'round';
+  g.beginPath();
+  if (role === 'heart') { for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? 11 : 26; g.lineTo(32 + Math.cos(a) * rr, 32 + Math.sin(a) * rr); } g.closePath(); }
+  else if (role === 'room') { g.arc(32, 36, 16, 0, Math.PI * 2); g.moveTo(20, 26); g.lineTo(18, 10); g.lineTo(28, 21); g.moveTo(44, 26); g.lineTo(46, 10); g.lineTo(36, 21); }
+  else if (role === 'blank') { g.moveTo(10, 32); g.lineTo(52, 32); g.moveTo(40, 20); g.lineTo(52, 32); g.lineTo(40, 44); }
+  else { g.moveTo(14, 18); g.lineTo(50, 18); g.lineTo(32, 48); g.closePath(); }
+  g.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  return t;
+}
+
+function prop(kind) {
+  const g = new THREE.Group();
+  if (kind === 'vending') {
+    g.add(box(0.9, 1.8, 0.7, 0xb8bcc0, 0.9));
+    g.add(box(0.7, 0.9, 0.02, 0xe8f0e0, 1.25, 0, 0.36));   // the lit front
+    g.add(box(0.5, 0.12, 0.02, 0x2a2a2e, 0.35, 0, 0.36));  // the slot
+  } else if (kind === 'bench') {
+    g.add(box(1.6, 0.06, 0.4, 0x8a7a5a, 0.42));
+    for (const s of [-0.65, 0.65]) g.add(box(0.06, 0.42, 0.36, 0x4a4a4e, 0.21, s));
+  } else if (kind === 'cart') {
+    g.add(box(0.6, 0.5, 0.4, 0x3a6a8a, 0.35));
+    g.add(box(0.04, 0.5, 0.04, 0xcfcfcf, 0.85, 0.28));
+    g.add(box(0.3, 0.3, 0.3, 0xe0d050, 0.75, -0.1));
+  }
+  return g;
+}
+
+const dirWord = (S, x, z) => {
+  const a = Math.atan2(x - S.x, z - S.z) - (S.yaw + Math.PI);   // the kitten faces yaw + π
+  const d = Math.atan2(Math.sin(a), Math.cos(a));
+  if (Math.abs(d) < Math.PI / 4) return 'ahead of you';
+  if (Math.abs(d) > (3 * Math.PI) / 4) return 'behind you';
+  return d > 0 ? 'to your left' : 'to your right';
+};
+
+export class Quilt {
+  constructor(scene, data, level, route, day, store, people, nav) {
+    this.scene = scene; this.data = data; this.store = store; this.people = people;
+    this.root = new THREE.Group();
+    scene.add(this.root);
+    this.patches = sew(data, level, route, day, PATCHES, { counter: people?.p.counter });
+    this.timer = null;
+    this.walked = [];
+    this.marks = [];
+    this.props = 0;
+    const tex = {};
+    for (const q of this.patches) {
+      q.seen = new Set();
+      q.state = null;
+      for (const rm of q.rooms) {
+        const t = tex[rm.role] || (tex[rm.role] = chalk(rm.role));
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+        m.rotation.x = -Math.PI / 2;
+        if (rm.role === 'blank' && rm.stitch === null) m.visible = false;
+        m.position.set(rm.x, rm.o * FH + 0.012, rm.z);
+        this.root.add(m);
+        this.marks.push({ m, rm });
+        const kind = rm.def.prop;
+        if (kind) {
+          // against the nearest wall within a few metres, facing into the passage; out in a wide concourse it
+          // stands free beside the spot
+          const n = nav(rm.o);
+          let best = null;
+          for (let i = 0; i < 16; i++) {
+            const a = (i / 16) * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
+            const d = n.ray(rm.x, rm.z, dx, dz, 7);
+            if (d > 1.4 && (!best || d < best.d)) best = { a, dx, dz, d };
+          }
+          const off = best ? (best.d < 7 ? best.d - 0.55 : 1.4) : 0;
+          const px = rm.x + (best ? best.dx : 0) * off, pz = rm.z + (best ? best.dz : 0) * off;
+          if (n.inside(px, pz)) {
+            const p = prop(kind);
+            p.position.set(px, rm.o * FH, pz);
+            p.rotation.y = (best ? best.a : 0) + Math.PI;
+            this.root.add(p);
+            this.props++;
+            rm.propAt = [px, pz];
+          }
+        }
+      }
+      if (q.kernel === 'talk') {
+        const h = q.heart;
+        const v = makePerson(Math.floor(hash(q.id) % 6));
+        const n = nav(h.o);
+        q.px = h.x; q.pz = h.z;
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          if (n.inside(h.x + Math.sin(a) * 0.9, h.z + Math.cos(a) * 0.9)) { q.px = h.x + Math.sin(a) * 0.9; q.pz = h.z + Math.cos(a) * 0.9; break; }
+        }
+        v.g.position.set(q.px, h.o * FH, q.pz);
+        v.g.rotation.y = Math.atan2(h.x - q.px, h.z - q.pz);
+        this.root.add(v.g);
+        q.person = v;
+      }
+    }
+  }
+
+  dispose() { this.scene.remove(this.root); }
+
+  nearest(S) {
+    for (const q of this.patches) {
+      if (q.kernel !== 'talk' || q.heart.o !== S.o) continue;
+      if (Math.hypot(q.px - S.x, q.pz - S.z) < 1.9) return { from: 'quilt', kind: 'talk', q, prompt: 'Listen' };
+    }
+    return null;
+  }
+
+  act(n, S) {
+    const q = n.q;
+    const out = [...q.heart.def.say];
+    const items = (this.people?.items || []).filter((it) => !it.taken);
+    if (items.length) {
+      const it = items.reduce((a, b) => (Math.hypot(b.x - S.x, b.z - S.z) < Math.hypot(a.x - S.x, a.z - S.z) ? b : a));
+      const m = Math.round(Math.hypot(it.x - S.x, it.z - S.z));
+      out.push(`"There's ${it.ja} lying about ${m} m ${dirWord(S, it.x, it.z)}${it.o !== S.o ? `, on ${floorName(it.o)}` : ''}."`);
+    } else out.push('"Nothing dropped today that hasn\'t been picked up."');
+    const c = this.people?.counter;
+    if (this.people?.bag.length && c) out.push(`"The lost-and-found is about ${Math.round(Math.hypot(c.x - S.x, c.z - S.z))} m ${dirWord(S, c.x, c.z)}${c.o !== S.o ? `, on ${floorName(c.o)}` : ''}."`);
+    this.enter(q, q.heart);
+    return out;
+  }
+
+  // mark a room as reached; true the first time
+  enter(q, rm) {
+    if (q.seen.has(rm)) return false;
+    q.seen.add(rm);
+    if (q.seen.size === q.rooms.length) { this.walked.push(q.name); this.store.bump('patches'); }
+    return true;
+  }
+
+  // every few frames: rooms you've walked into, the run kernel's clock. Returns lines to show.
+  tick(S) {
+    const out = [];
+    if (this.timer && performance.now() > this.timer.until) {
+      const q = this.timer.q;
+      this.timer = null;
+      q.state = 'missed';
+      out.push(...q.heart.def.missed);
+    }
+    for (const q of this.patches) {
+      const ring = q.rooms.filter((x) => x.role === 'room');
+      for (const rm of q.rooms) {
+        if (rm.o !== S.o || Math.hypot(rm.x - S.x, rm.z - S.z) > 3.5) continue;
+        // the run's finish line, even if you passed it before the clock started
+        if (this.timer && this.timer.q === q && rm === this.timer.gate) {
+          this.timer = null;
+          q.state = 'won';
+          this.store.stamp();
+          out.push(...q.heart.def.found);
+          this.enter(q, rm);
+          continue;
+        }
+        // explore's find, once every room around the heart has been found
+        if (rm.role === 'heart' && q.kernel === 'explore' && q.state !== 'found' && ring.every((x) => q.seen.has(x))) {
+          q.state = 'found';
+          this.store.stamp();
+          out.push(...q.heart.def.found);
+          this.enter(q, rm);
+          continue;
+        }
+        const first = q.seen.size === 0;
+        if (!this.enter(q, rm)) {
+          // a run you haven't tried yet (another patch's clock was running) starts when you come back
+          if (rm.role === 'heart' && q.kernel === 'run' && q.state === null && !this.timer) this.start(q, out);
+          continue;
+        }
+        if (first) out.push(`✶ ${q.name}`);
+        if (rm.role === 'blank') {
+          out.push(rm.stitch ? `Chalked on the floor: an arrow, and "${rm.stitch.name}", ${rm.stitch.m.toLocaleString()} m${rm.stitch.o !== rm.o ? ` (${floorName(rm.stitch.o)})` : ''}.` : `${rm.name}. Nothing here yet.`);
+        } else if (rm.role === 'gate') {
+          out.push(...rm.def.say, `${rm.name}: this patch's way to another floor.`);
+        } else if (rm.role === 'heart') {
+          if (q.kernel === 'talk') continue;          // they talk when you listen
+          out.push(...rm.def.say);
+          if (q.kernel === 'run' && !this.timer) this.start(q, out);
+        } else {
+          out.push(...rm.def.say);
+          if (q.kernel === 'explore' && q.state !== 'found' && ring.every((x) => q.seen.has(x)) && q.seen.has(q.heart)) {
+            out.push(...(q.heart.def.then || [`Something has changed in ${q.name}.`]));
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  start(q, out) {
+    const g = q.rooms.find((x) => x.role === 'gate');
+    const m = around(this.data, q.heart.node, NODE * 2).get(g.node) ?? NODE;
+    const s = Math.round(m / 4 + 6);
+    this.timer = { q, gate: g, until: performance.now() + s * 1000 };
+    q.state = null;
+    out.push(`${s} seconds to the ${g.name.toLowerCase()}, ${Math.round(m)} m.`);
+  }
+
+  // the run's clock, for the HUD
+  clock(S) {
+    if (!this.timer) return '';
+    const s = Math.max(0, Math.ceil((this.timer.until - performance.now()) / 1000));
+    const g = this.timer.gate;
+    return `⏱ ${s} s · ${g.name}${g.o === S.o ? `, ${Math.round(Math.hypot(g.x - S.x, g.z - S.z))} m` : ''}`;
+  }
+
+  update(dt, S, time) {
+    for (const { m, rm } of this.marks) {
+      if (rm.o !== S.o) { m.material.opacity = 0; continue; }
+      const d = Math.hypot(rm.x - S.x, rm.z - S.z);
+      m.material.opacity = Math.max(0, Math.min(1, (16 - d) / 8)) * 0.8;
+    }
+    for (const q of this.patches) if (q.person) {
+      q.person.g.visible = q.heart.o === S.o;
+      q.person.head.rotation.y = Math.sin(time * 0.4 + q.heart.x) * 0.5;
+    }
+  }
+}

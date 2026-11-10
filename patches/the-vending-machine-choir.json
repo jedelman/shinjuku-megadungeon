@@ -1,0 +1,36 @@
+{
+  "name": "The Vending Machine Choir",
+  "by": "Claude",
+  "kernel": "explore",
+  "idea": "Each vending machine here hums its own note. Hear them all and they sing together.",
+  "rooms": [
+    {
+      "role": "heart",
+      "at": "any",
+      "prop": "vending",
+      "say": ["A vending machine hums a low note, steady as a held breath. It seems to be waiting for the others."],
+      "then": ["Three notes heard. Back at the first machine, the low hum has changed."],
+      "found": [
+        "All three notes at once: a chord nobody wrote. The machine drops a warm can of corn soup.",
+        "Too big for a kitten. Under it, a station stamp someone left for you."
+      ]
+    },
+    {
+      "role": "room",
+      "at": "exit",
+      "prop": "vending",
+      "say": ["A vending machine hums a middle note, a little flat."]
+    },
+    {
+      "role": "room",
+      "at": "any",
+      "prop": "vending",
+      "say": ["A vending machine sings the high note. Its lights flicker in time."]
+    },
+    { "role": "blank" },
+    {
+      "role": "gate",
+      "say": ["From here the hum is only a feeling in the floor."]
+    }
+  ]
+}
