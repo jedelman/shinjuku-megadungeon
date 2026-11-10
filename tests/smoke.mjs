@@ -434,8 +434,13 @@ for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sa
   await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.trains);
   await page.evaluate(() => { window.__game.store.data.notes = []; });
   await page.addStyleTag({ content: '#say{display:none!important}' });
+  await page.mouse.click(640, 360);   // a tap: the sound starts
   await page.evaluate((i) => window.__game.trains.force(i, false), v.ti);
   await page.waitForTimeout(3000);
+  const snd = await page.evaluate(() => ({ state: window.__game.sound.ctx?.state, level: window.__game.sound.level(), dings: window.__game.sound.dings }));
+  console.log('sound', JSON.stringify(snd));
+  if (snd.state !== 'running' || !(snd.level > 0.001)) errors.push(`no sound after a tap (${JSON.stringify(snd)})`);
+  if (snd.dings < 1) errors.push('the doors opened without a chime');
   const t1 = await page.evaluate((i) => ({ st: window.__game.trains.state(i), shown: window.__game.trains.built.get(i)?.train.g.visible, crowd: window.__game.crowd.active.length, fps: window.__game.S.fps }), v.ti);
   console.log('train', v.line, JSON.stringify(t1));
   if (!t1.st || t1.st.phase !== 'stop' || !t1.shown) errors.push(`no train at the platform (${JSON.stringify(t1)})`);
@@ -448,6 +453,25 @@ for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sa
   console.log('tanuki', JSON.stringify(t2));
   if (!t2.shown || !t2.notes.includes('tanuki')) errors.push(`no tanuki, or no field note for them (${JSON.stringify(t2)})`);
   await page.screenshot({ path: `${out}/rail-tanuki.png` });
+}
+
+// A fog pocket: the fog closes in, the crowd is gone, the music hushes
+{
+  await page.goto(base + '?level=0&play&day=2026-11-10');
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.fog);
+  const f = await page.evaluate(() => window.__game.fog.find((p) => p.way));
+  if (!f) errors.push('no fog pocket on the way');
+  else {
+    await page.goto(base + `?level=0&play&day=2026-11-10&x=${f.x}&z=${f.z}&o=${f.o}`);
+    await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.crowd);
+    await page.mouse.click(640, 360);
+    await page.waitForTimeout(3500);
+    const st = await page.evaluate(() => ({ mist: window.__game.mist, crowd: window.__game.crowd.active.length, said: document.getElementById('say').textContent, range: window.__game.shared.uFogRange.value.y }));
+    console.log('fog pocket', JSON.stringify(st));
+    if (st.mist < 0.99 || st.crowd > 0 || st.range > 8) errors.push(`the fog pocket isn't foggy and empty (${JSON.stringify(st)})`);
+    if (st.said !== f.line) errors.push(`no line on walking into the fog (${st.said})`);
+    await page.screenshot({ path: `${out}/fog-pocket.png` });
+  }
 }
 
 // Pointless treasure: walk onto the one in the nearest dead end

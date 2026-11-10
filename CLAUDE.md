@@ -15,7 +15,7 @@ npm install                 # .npmrc sets legacy-peer-deps (npm's resolver trips
 npm run data                # rebuild public/data/{shinjuku,tokyo}.json from the raw zips (needs: pip install pyshp shapely)
 npm test                    # vitest: data, level 0's route, collision, kitten clips bind + animate
 npm run build               # dist/
-npx vite preview --port 4173 &  node tests/smoke.mjs   # headless Chromium: screenshots, rides, outside, finish
+npx vite preview --port 4173 &  node tests/smoke.mjs   # headless Chromium: screenshots, rides, outside, sound, fog, finish
 ```
 
 Query params for testing: `?play` skips the title, `?x=&z=&o=&yaw=` spawns anywhere (metres from
@@ -141,7 +141,18 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 - `src/treasure.js`: a pointless treasure in every real dead end (one link, underground, reachable, not an exit, gate or
   stair foot), its kind drawn from tonight's chart. Walk onto it to take it. The `Store` keeps the collection
   (`treasures`) and tonight's emptied dead ends (`found`). They do nothing, on purpose.
+- `src/audio.js`: all sound, synthesised with Web Audio (no recordings, every note original).
+  - **Music.** Generative bells and plucks on a pentatonic over a drone, in tonight's key (`rootOf(chart)`), through a
+    limiter. `setMood({hush, patch, crowd})` makes a patch a music box and a fog pocket nearly silent.
+  - **Trains.** `trains(listener, trains.heard, dt)` rumbles each train from its nearest part with Doppler (`doppler(v)`,
+    from `timetable()`'s `v`), clacks and tanuki drums. `ding()` plays the door chimes from `trains.dings`.
+  - **Starting.** Sound starts on the first tap or key (browser rule); M / ♪ mutes it, remembered in `md.sound`.
+- `src/fog.js`: fog pockets, 2–3 a night from the chart, at least one on the way to the goal, clear of patches. Inside
+  one, the fog closes in (`MIST` in `main.js`), the crowd is gone (`Crowd.update(..., empty)`), and the music hushes.
+  Wave 2 puts yokai here.
 - `node tests/parade.mjs` (with `vite preview` running) records the tanuki parade to webm/mp4.
+- `node tests/listen.mjs` (with `vite preview` running) records a minute on a platform *with sound* (the page records
+  its own mix; ffmpeg muxes it with Playwright's silent video). Check a mix's loudness with ffmpeg's `volumedetect`.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered

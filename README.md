@@ -52,14 +52,19 @@ Trains run on the real platforms (from OpenStreetMap), stop behind the platform 
 is a lot of tanuki pretending, stacked three high, after the old phantom-train tales. Goofy, blocky commuters shuffle
 through the concourses and wait on the platforms, and thin out at midnight inside the patches.
 
+It sounds like somewhere: very chill generative music (soft bells, plucked strings, a drone, in tonight's key), trains
+that rumble past with a real Doppler shift and chime their doors open and closed, and tanuki who drum their bellies.
+Everything is synthesised in the browser. The station is busy, which is why the fog pockets are unsettling: the fog
+closes in, the music falls away, and the people are simply gone.
+
 Every dead end has a consolation prize: a pointless treasure (a marble, a one-yen coin, an empty soy-sauce fish, a key to
 nothing). They do nothing. You'll want them all.
 
 ## Play
 
-- **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart.
+- **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart, M for sound.
 - **Gamepad:** left stick to walk, right stick to look, Ⓐ to take stairs, Ⓑ / RT for zoomies, Start to restart.
-- **Phone:** play in landscape. Left thumb walks, right thumb looks, and a ▲▼ button appears at stairs.
+- **Phone:** play in landscape. Left thumb walks, right thumb looks, and a ▲▼ button appears at stairs. ♪ turns sound off and on.
 
 Live: https://shinjuku-megadungeon.jason-edelman.org
 

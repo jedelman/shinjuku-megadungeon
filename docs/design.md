@@ -323,14 +323,14 @@ lifts and escalators). The pipeline:
   the 偽汽車 tales (yokai.jp), "in the stories, the real train usually won".
 
 **The crowd** (`src/crowd.js`):
-- **Walking.** About 24 goofy, blocky commuters walk the real walking network on the kitten's floor. They fade in and
+- **Walking.** About 34 goofy, blocky commuters walk the real walking network on the kitten's floor. They fade in and
   out of the fog and sidestep the kitten. They turn see-through between the camera and the kitten, like walls.
 - **Waiting.** On platforms they wait facing the track, phone in hand, and board when a train stands with its doors
   open.
 - **Patches.** Inside a patch (another night, at midnight) the station nearly empties.
 - **Cost.** Each commuter is five meshes: a merged body plus swinging legs and arms (`src/blocks.js`).
 
-**Not yet:** alighting passengers, sound (an original melody per station, never the real ones), and trains between
+**Not yet:** alighting passengers, an original departure melody per station (never the real ones), and trains between
 stations (step 4).
 
 ## Pointless treasure (2026-11-10)
@@ -354,6 +354,62 @@ Also in this change:
   platform.
 - `node tests/parade.mjs` records the tanuki parade (webm, and mp4 with ffmpeg). `Trains.force(i, tanuki, approach)`
   can start an arrival out in the tunnel.
+
+## Sound, and fog pockets (2026-11-10)
+
+Jason: "extremely chill ambient music. Soft bells and plucked strings, and train sounds - rumbles with doppler, dings
+for doors opening and closing. We should somewhat fill this with people, so the encounters feel creepy - fog and no
+people, and some kind of yokai." This is the first of two waves; yokai and the Dodge / Pounce / Sass encounters come
+next.
+
+**The music** (`src/audio.js`). Everything is synthesised with Web Audio, so there are no recordings and every note is
+original.
+- **Notes.** Sparse plucked strings and soft bells on a major pentatonic, so no two notes clash, over I–IV–vi–V in slow
+  four-bar steps. The bells use inharmonic partials, each fading at its own rate.
+- **Space.** A quiet drone (the root and its fifth, breathing) sits under it all, in a long station reverb.
+- **Key.** Tonight's chart sets the key: the Sun's sign picks the root, A2 to G#3.
+- **Mood.** Inside a patch (another night) the bells take over, like a music box. In a fog pocket the tune falls away
+  to the drone and a draught.
+- **Level.** A gentle limiter keeps a train and a chime together from clipping. A recording mixes to about −23 dB mean,
+  −2 dB peak.
+
+**Train sounds:**
+- **Rumble.** Each train near you rumbles from its nearest part (a train is long). The rumble is low-passed brown
+  noise, louder and brighter with speed, panned to where the train is.
+- **Doppler.** The pitch is shifted by c / (c − v), with v the train's real speed toward you from the timetable (now
+  pure in `timetable()`). It's exaggerated 2.5×, so you hear it pass: ×1.21 braking in, ×0.84 pulling out.
+- **Clacks.** Rail joints knock in pairs, one per bogie, faster as it speeds up. A stopped train still hums.
+- **Door chimes.** Original: two notes up as the doors open, three down as they start to close. They come from the
+  door nearest you.
+- **Tanuki.** They have no doors. They drum their bellies as they go: pon, poko poko poko.
+
+**Starting and stopping.** Browsers only allow sound after a tap or key, so the first one starts it.
+- M or the ♪ button turns it off and on, remembered per browser (`md.sound`).
+- A hidden tab goes quiet.
+- Unverified: whether a gamepad press alone can start sound. If not, the first key or tap does.
+
+**More people.** About 34 walkers (was 24) and 7 waiting per platform (was 5), so the station feels busy and emptiness
+means something. Headless fps holds around 33–60.
+
+**Fog pockets** (`src/fog.js`):
+- **Where.** Two or three a night, from tonight's chart: up to two on the way to the goal (so you walk into one) and one
+  anywhere you can reach. They're underground, on the floor, at least 60 m apart, and 30 m clear of patches (another
+  night has its own weather), the start and the goal. `pockets()` is pure.
+- **What happens.** Within 9 m of the middle the fog closes to 6.5 m, pale and still, and thins over 10 m more. Lit
+  signs glow through it.
+- **The crowd.** It thins as you go in, and past halfway anyone more than a few steps off is simply not there. Walk
+  out, and people come back from a distance, out of the haze, not beside you.
+- **Noticing.** A line appears once per pocket: "The crowd was here a moment ago."
+- **Next.** In wave 2, this is where the yokai wait.
+
+**Tests:**
+- `tests/audio.test.js`: the Doppler factor, and the key from the chart.
+- `tests/fog.test.js`: pockets are real places, deterministic per night, clear of patches, and one is on the way.
+- `tests/trains.test.js`: the timetable's speed matches its motion, and the crowd empties in fog and comes back from a
+  distance.
+- The smoke test taps and checks the sound is running and a chime rang, then walks into a fog pocket.
+- `node tests/listen.mjs` records a minute on the Marunouchi platform with sound. Playwright's video has no audio, so
+  the page records its own mix and ffmpeg muxes the two.
 
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
@@ -406,8 +462,10 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **3e. Done 2026-11-10:** critters: pigeons, black rats, geckos, pill bugs, swallows (field notes with sources).
 - **3f. Done 2026-11-10:** trains on OSM platforms (sometimes tanuki), platform doors, and a crowd.
 - **3g. Done 2026-11-10:** pointless treasure in every dead end.
+- **3h. Done 2026-11-10:** sound (generative music, train rumble with Doppler, door chimes), a busier crowd, fog pockets.
+- **3i.** Yokai in the fog, and Dodge / Pounce / Sass encounters.
 - **4.** The network: lines, trains, more stations from OSM.
-- **Sound** throughout: original departure melodies, rooms with their own hum.
+- **Sound**, still to do: an original departure melody per station, rooms with their own hum.
 
 ## Open
 

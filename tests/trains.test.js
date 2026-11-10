@@ -51,6 +51,21 @@ describe('the timetable', () => {
     }
     expect(seen.in && seen.stop && seen.out).toBeTruthy();
   });
+  it('knows how fast each train is going, for the Doppler shift', () => {
+    const tr = rail.tracks[0];
+    let checked = 0, top = 0;
+    for (let t = 0; t < 400; t += 0.25) {
+      const a = timetable(tr, sky, 'level', 0, t), b = timetable(tr, sky, 'level', 0, t + 0.01);
+      if (!a || !b || a.k !== b.k || a.phase !== b.phase) continue;
+      expect(a.v).toBeCloseTo((b.s - a.s) / 0.01, 0);
+      if (a.phase === 'stop') expect(a.v).toBe(0);
+      top = Math.max(top, Math.abs(a.v));
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(100);
+    expect(top).toBeGreaterThan(15);   // a real train's pace coming out of a tunnel
+    expect(top).toBeLessThan(30);
+  });
   it('sends tanuki about one arrival in six', () => {
     let n = 0;
     for (let k = 0; k < 1200; k++) if (isTanuki(sky, 'level', k % 7, k)) n++;
@@ -81,6 +96,22 @@ describe('the crowd', () => {
     const inside = act.filter((p) => nav(p.o).inside(p.x, p.z)).length;
     expect(inside / act.length).toBeGreaterThan(0.8);
     for (let i = 0; i < 60; i++) crowd.update(1 / 30, S, 4 + i / 30, true);   // midnight inside a patch: nearly empty
-    expect(crowd.active.filter((p) => p.mode === 'walk').length).toBeLessThanOrEqual(24);
+    expect(crowd.active.filter((p) => p.mode === 'walk').length).toBeLessThanOrEqual(34);
+  });
+  it('is gone in a fog pocket, and comes back out of the haze when you leave it', () => {
+    const data = load('shinjuku');
+    const navs = new Map();
+    const nav = (o) => { const k = floorKey(o); if (!navs.has(k)) navs.set(k, new FloorNav(data.floors[k])); return navs.get(k); };
+    const crowd = new Crowd(new THREE.Scene(), data, null, nav, null, 7);
+    const S = { x: 28.81, z: -426.74, o: -2, outside: false };
+    for (let i = 0; i < 120; i++) crowd.update(1 / 30, S, i / 30, false);
+    expect(crowd.active.length).toBeGreaterThan(20);
+    for (let i = 0; i < 30; i++) crowd.update(1 / 30, S, 4 + i / 30, false, 1);
+    for (const p of crowd.active) expect(Math.hypot(p.x - S.x, p.z - S.z)).toBeLessThanOrEqual(3.6);
+    for (let i = 0; i < 300; i++) crowd.update(1 / 30, S, 5 + i / 30, false, 1);
+    expect(crowd.active.length).toBe(0);
+    for (let i = 0; i < 10; i++) crowd.update(1 / 30, S, 20 + i / 30, false, 0);
+    expect(crowd.active.length).toBeGreaterThan(0);
+    for (const p of crowd.active) expect(Math.hypot(p.x - S.x, p.z - S.z)).toBeGreaterThan(20);   // from a distance, in the haze
   });
 });

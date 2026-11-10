@@ -90,17 +90,21 @@ export class Crowd {
     return -1;
   }
 
-  update(dt, S, time, quiet) {
+  // quiet: inside a patch (another night, at midnight). empty: how deep you are in a fog pocket, 0..1
+  update(dt, S, time, quiet, empty = 0) {
     const nav = this.navOf(S.o);
-    const want = S.outside || S.o >= 1 ? 0 : quiet ? 3 : 24;
-    // people too far away, or on another floor, go home
+    const want = S.outside || S.o >= 1 || empty > 0.5 ? 0 : Math.round((quiet ? 3 : 34) * (1 - 2 * empty));
+    // people too far away, or on another floor, go home; in the fog, anyone a few steps off is simply not there
     for (const p of this.active) {
-      if (p.o !== S.o || Math.hypot(p.x - S.x, p.z - S.z) > 46 || p.gone) { p.on = false; p.g.visible = false; p.gone = false; }
+      const d = Math.hypot(p.x - S.x, p.z - S.z);
+      if (p.o !== S.o || d > 46 || p.gone || (empty > 0.5 && d > 3.5)) { p.on = false; p.g.visible = false; p.gone = false; }
     }
     // walkers
     let walkers = this.active.filter((p) => p.mode === 'walk').length;
-    for (let t = 0; t < 4 && walkers < want; t++) {
-      const k = this.spawnNode(S, this.warm);
+    // coming out of the fog, people come back from a distance, out of the haze, not right beside you
+    this.clear = empty > 0.05 ? 0 : (this.clear ?? Infinity) + dt;
+    for (let t = 0; t < 5 && walkers < want; t++) {
+      const k = this.spawnNode(S, this.warm && this.clear > 8);
       if (k < 0) break;
       const nb = this.adj[k];
       const p = this.person();
@@ -110,11 +114,11 @@ export class Crowd {
     this.warm = walkers < want * 0.8;
     // people waiting on the platforms of this floor, near the kitten (none while a train stands there: they're boarding)
     const boarding = new Set((this.trains?.stopped(S) || []).map((s) => s.i));
-    if (!quiet) for (const [pi, pl] of (this.rail.platforms || []).entries()) {
+    if (!quiet && empty < 0.2) for (const [pi, pl] of (this.rail.platforms || []).entries()) {
       if (pl.o !== S.o || Math.hypot(pl.c[0] - S.x, pl.c[1] - S.z) > pl.L / 2 + 30) continue;
       if (pl.tracks.some((t) => boarding.has(t.track))) continue;
       const waiting = this.active.filter((p) => p.mode === 'wait' && p.platform === pi).length;
-      for (let t = waiting; t < 5; t++) {
+      for (let t = waiting; t < 7; t++) {
         const tk = pl.tracks[Math.floor(this.r() * pl.tracks.length)];
         const tr = this.rail.tracks[tk.track];
         const along = (this.r() - 0.5) * pl.L * 0.8;

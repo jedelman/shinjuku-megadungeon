@@ -12,6 +12,8 @@ import { Trains } from './trains.js';
 import { Crowd } from './crowd.js';
 import { Treasure, TREASURES } from './treasure.js';
 import { tonight, describe, longDate, skySeed } from './sky.js';
+import { Sound } from './audio.js';
+import { pockets, fogAt, pocketAt } from './fog.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -21,6 +23,8 @@ const RADIUS = 0.12; // a kitten fits through gaps people don't
 const KIND_NAME = { 4: 'Lift', 5: 'Escalator', 6: 'Stairs', 7: 'Slope' };
 const COLD = { fog: new THREE.Color(0x1b2430), range: new THREE.Vector2(1, 14) };
 const WARM = { fog: shared.uFog.value.clone(), range: shared.uFogRange.value.clone() };
+const MIST = { fog: new THREE.Color(0xc4cacd), range: new THREE.Vector2(0.3, 6.5) };   // a fog pocket: pale, close (the shader skips colour management, so this shows darker)
+const envFog = new THREE.Color(), envRange = new THREE.Vector2();
 
 // goal marker: a soft column of light at the gate
 const beacon = new THREE.Mesh(
@@ -92,6 +96,8 @@ scene.add(beacon);
 const input = new Input(canvas);
 const store = new Store((() => { try { return localStorage; } catch { return null; } })());
 const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
+const sound = new Sound((() => { try { return localStorage.getItem('md.sound') === 'off'; } catch { return false; } })());
+let fog = [], fogSeen = new Set(), mist = 0;
 let people = null, quilt = null, critters = null, trains = null, crowd = null, treasure = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
@@ -126,6 +132,10 @@ function spawn() {
   // a pointless treasure at the end of every dead end
   treasure?.dispose();
   treasure = new Treasure(scene, data, level, route, sky, store);
+  // fog pockets, where the crowd is gone; and tonight's key for the music
+  fog = pockets(data, level, route, sky, quilt.patches);
+  fogSeen = new Set();
+  sound.key(sky);
   visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
@@ -296,6 +306,8 @@ function update(dt) {
     // the quilt's patches: rooms you walk into, and the run kernel's clock
     const ql = quilt ? quilt.tick(S) : [];
     if (ql.length) say(ql);
+    const pk = !S.outside && pocketAt(fog, S.x, S.z, S.o);
+    if (pk && !fogSeen.has(pk.id)) { fogSeen.add(pk.id); say([pk.line]); }
     for (const p of placeList) {
       if (p.o === S.o && Math.hypot(p.x - S.x, p.z - S.z) < 8 && visited.add(p.key) && performance.now() > sayUntil) say([`New place: ${p.name}`]);
     }
@@ -360,16 +372,24 @@ function draw(time, dt) {
   // fog: fluorescent haze below ground, cold dark outside
   // inside a patch you're in its night: its season's light
   const env = S.outside ? COLD : quilt?.zone ? { fog: quilt.zone.warp.fog, range: WARM.range } : WARM;
-  shared.uFog.value.lerp(env.fog, 0.08);
-  shared.uFogRange.value.lerp(env.range, 0.08);
+  // in a fog pocket the haze closes in, pale
+  mist = S.outside || S.state !== 'play' ? 0 : fogAt(fog, S.x, S.z, S.o);
+  envFog.copy(env.fog).lerp(MIST.fog, mist);
+  envRange.copy(env.range).lerp(MIST.range, mist);
+  shared.uFog.value.lerp(envFog, 0.08);
+  shared.uFogRange.value.lerp(envRange, 0.08);
 
   people?.update(dt, S, time);
   quilt?.update(dt, S, time);
   if (S.state === 'play' && !S.done) {
     const met = [...(critters?.update(dt, S, time) || []), ...(trains?.update(dt, S, time) || []), ...(treasure?.update(dt, S, time) || [])];
     if (met.length) say(met);
-    crowd?.update(dt, S, time, !!quilt?.zone);   // inside a patch it's another night, at midnight: nearly empty
-  }
+    crowd?.update(dt, S, time, !!quilt?.zone, mist);   // inside a patch it's another night, at midnight: nearly empty
+    // what you hear: the music's mood, the trains from where they are, the doors
+    const L = { x: S.x, z: S.z, o: S.o, yaw: S.yaw };
+    sound.setMood({ hush: mist, patch: !!quilt?.zone, crowd: crowd?.active.length || 0 });
+    if (trains) { sound.trains(L, trains.heard, dt); for (const d of trains.dings) sound.ding(d.kind, L, d.x, d.z); }
+  } else sound.setMood({ hush: 0, patch: false, crowd: 0 });
   ps1.render(scene, camera);
   hud();
 }
@@ -495,6 +515,15 @@ function updateFsButton() {
 }
 document.addEventListener('fullscreenchange', updateFsButton);
 
+// Sound can only start inside a tap or a key press, so the first one starts it; M (or ♪) turns it off and on.
+const showSound = () => { $('snd').classList.toggle('off', sound.muted); $('snd').setAttribute('aria-pressed', String(!sound.muted)); };
+const toggleSound = () => { sound.toggle(); try { localStorage.setItem('md.sound', sound.muted ? 'off' : 'on'); } catch { /* private window */ } showSound(); };
+showSound();
+addEventListener('pointerdown', () => sound.start(), true);
+addEventListener('keydown', (e) => { sound.start(); if (e.code === 'KeyM' && !e.repeat) toggleSound(); }, true);
+document.addEventListener('visibilitychange', () => sound.pause(document.hidden));
+$('snd').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound.start(); toggleSound(); });
+
 // The title card sits on top of the canvas, so it takes the tap itself (the canvas never sees it).
 $('title').addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'mouse') { input.mode = 'touch'; goFullscreen(); }
@@ -514,4 +543,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get treasure() { return treasure; }, get crowd() { return crowd; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get treasure() { return treasure; }, get crowd() { return crowd; }, sound, get fog() { return fog; }, get mist() { return mist; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
