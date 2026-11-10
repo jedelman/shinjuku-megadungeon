@@ -13,7 +13,7 @@ links, and the data survey. Its CLAUDE.md sets the daily-journal convention, whi
 ```bash
 npm install                 # .npmrc sets legacy-peer-deps (npm's resolver trips on vitest's optional peers)
 npm run data                # rebuild public/data/shinjuku.json from the raw zip (needs: pip install pyshp shapely)
-npm test                    # vitest: data integrity, level 0's route, collision never leaves the walkable area
+npm test                    # vitest: data, level 0's route, collision, kitten clips bind + animate
 npm run build               # dist/
 npx vite preview --port 4173 &  node tests/smoke.mjs   # headless Chromium: screenshots, rides, outside, finish
 ```
@@ -67,6 +67,13 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   `src/world.js` builds per-floor meshes (long triangles are split so affine texturing holds up).
   `src/main.js` runs the loop, camera, rides, the outside rule and the HUD. `src/input.js` handles keys,
   gamepad and touch.
+- `src/kitten.js`: the player. Rigid segments on named joints (PS1-style, no skin), animated by **three's
+  `AnimationMixer`** with clips authored in code: idle, sit, walk, trot, gallop, hop. Gaits are weighted by
+  speed and phase-locked; the cycle advances by distance over stride length, so paws plant. New clips go in
+  `makeClips()`; `tests/kitten.test.js` fails if a track names a joint that doesn't exist. **Not R3F:** R3F is
+  a React renderer and adds no animation (drei's `useAnimations` wraps this same mixer). If React is ever
+  wanted for other reasons, this module mounts as a `<primitive>` unchanged.
+- `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - Floors are ordinals only; `FH` (5 m) and `CH` (3.1 m) in `world.js` are design choices, not data.
 
 ## Git

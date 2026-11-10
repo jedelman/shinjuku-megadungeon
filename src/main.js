@@ -193,12 +193,12 @@ function update(dt) {
     let nx, nz;
     if (S.outside) { nx = S.x + vx * speed * dt * 0.35; nz = S.z + vz * speed * dt * 0.35; } // cold, slow, nowhere to go
     else [nx, nz] = n.move(S.x, S.z, vx * speed * dt, vz * speed * dt, RADIUS);
-    S.walked += Math.hypot(nx - S.x, nz - S.z);
+    const moved = Math.hypot(nx - S.x, nz - S.z);
+    S.walked += moved;
+    S.speed += (moved / Math.max(dt, 1e-3) - S.speed) * Math.min(1, dt * 12); // real ground speed: legs stop at walls
     S.x = nx; S.z = nz;
     S.head = Math.atan2(vx, vz);
-    S.phase += dt * (5 + speed * 2.2);
-    S.speed = speed;
-  } else S.speed = 0;
+  } else S.speed += (0 - S.speed) * Math.min(1, dt * 12);
   if (S.outside) {
     // you can only go back the way you came: the street isn't part of the dungeon
     const e = nearestEnd();
@@ -234,7 +234,7 @@ function draw(time, dt) {
   const baseY = S.ride ? S.rideY : S.o * FH;
   kitten.root.position.set(S.x, baseY, S.z);
   kitten.root.rotation.y = S.head;
-  kitten.animate(dt, S.phase, S.ride ? (S.ride.kind === 6 ? 2 : 0) : S.speed);
+  kitten.animate(dt, S.ride ? 0 : S.speed, S.ride ? { 4: 'lift', 5: 'escalator', 6: 'stairs' }[S.ride.kind] : null);
   beacon.material.opacity = 0.25 + 0.12 * Math.sin(time * 2.2);
 
   // camera: behind and above, pulled in by walls, kept under the ceiling
@@ -248,7 +248,15 @@ function draw(time, dt) {
   dh = Math.max(0.35, dh);
   let cy = target.y + Math.sin(S.pitch) * d0 * Math.max(0.3, dh / want);
   if (!S.outside) cy = Math.min(cy, (S.ride ? Math.max(S.o, S.ride.to) : S.o) * FH + CH - 0.2);
-  camera.position.set(S.x + dx * dh, cy, S.z + dz * dh);
+  let cx = S.x + dx * dh, cz = S.z + dz * dh;
+  if (!S.ride && !S.outside) {
+    // the camera has a body too: keep it inside the walkable area and off the walls
+    const n = nav(S.o);
+    for (let i = 0; i < 10 && !n.inside(cx, cz); i++) { dh *= 0.75; cx = S.x + dx * dh; cz = S.z + dz * dh; }
+    [cx, cz] = n.clear(cx, cz, 0.2);
+    if (!n.inside(cx, cz)) { cx = S.x + dx * 0.3; cz = S.z + dz * 0.3; }
+  }
+  camera.position.set(cx, cy, cz);
   camera.lookAt(target.x - dx * 0.6, target.y + 0.32, target.z - dz * 0.6);
 
   // draw only chunks the fog hasn't swallowed

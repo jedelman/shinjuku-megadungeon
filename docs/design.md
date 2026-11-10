@@ -38,7 +38,10 @@ have big dramatic bossfights."
   obvious seat for abilities later.
 - A kitten fits where people don't: collision radius 0.12 m. Under gate flaps, between pillar and wall.
   That's a mechanic waiting to happen.
-- Speeds: a 2.4 m/s trot, 6.5 m/s zoomies, and stairs taken at a bound.
+- Speeds: a 2.4 m/s trot, 6.5 m/s zoomies, and stairs taken at a bound. Gaits blend by real ground speed:
+  walk (4-beat) below ~1 m/s, trot, then a half-bound gallop with a flexing spine. On escalators and in lifts
+  the kitten sits, and it sits down by itself after a few idle seconds. Animation is three's AnimationMixer
+  (see CLAUDE.md), not R3F.
 - **Boss scale, proposals only:** the station's floor-scrubbing machine on its night round, a lost-umbrella
   colossus, and the shoulder-checking man, whom the kitten
   beats (see the content rules). There's also kira's joke, "first boss: an exit sign that leads back to the

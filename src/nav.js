@@ -87,6 +87,21 @@ export class FloorNav {
     return [px, pz];
   }
 
+  // push a circle of radius r off any walls it overlaps, without moving it otherwise (for the camera)
+  clear(x, z, r) {
+    for (let it = 0; it < 4; it++) {
+      let pushed = false;
+      for (const i of this.near(x, z, r + 0.1)) {
+        const [x1, z1, x2, z2] = this.walls[i];
+        const [cx, cz] = closest(x, z, x1, z1, x2, z2);
+        const d = Math.hypot(x - cx, z - cz);
+        if (d < r && d > 1e-6) { x = cx + ((x - cx) / d) * r; z = cz + ((z - cz) / d) * r; pushed = true; }
+      }
+      if (!pushed) break;
+    }
+    return [x, z];
+  }
+
   // distance along a ray before hitting a wall (for the camera)
   ray(x, z, dx, dz, maxd) {
     let best = maxd;
