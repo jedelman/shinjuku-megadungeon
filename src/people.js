@@ -17,6 +17,7 @@ import { distancesTo, nearestNode } from './nav.js';
 // Elsewhere the game puts the counter at a real MLIT station office near the middle of the level, and says so.
 export const LOST_AND_FOUND = {
   shinjuku: { x: -68.58, z: -122.32, o: -2, real: true },
+  'shinjuku-astra': { x: -68.58, z: -122.32, o: -2, real: true },   // same frame, same counter
 };
 
 export const ITEMS = [

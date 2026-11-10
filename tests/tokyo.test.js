@@ -29,12 +29,12 @@ describe('world data (MLIT Tokyo Station area)', () => {
 describe('every level', () => {
   for (const L of LEVELS) {
     const data = load(L.station);
-    const gates = data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
-    it(`${L.id}: goal gate exists, start is walkable, and there's a route that never surfaces`, () => {
-      expect(gates.length).toBeGreaterThan(0);
+    const gates = L.goal.at ? [] : data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
+    it(`${L.id}: goal exists, start is walkable, and there's a route that never surfaces`, () => {
+      if (!L.goal.at) expect(gates.length).toBeGreaterThan(0);
       expect(new FloorNav(data.floors[floorKey(L.start.o)]).inside(L.start.x, L.start.z)).toBe(true);
-      const gx = gates.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gates.length;
-      const gz = gates.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gates.length;
+      const gx = L.goal.at ? L.goal.at.x : gates.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gates.length;
+      const gz = L.goal.at ? L.goal.at.z : gates.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gates.length;
       const R = distancesTo(data, nearestNode(data, gx, gz, L.goal.o), { underground: true });
       const d = R.dist[nearestNode(data, L.start.x, L.start.z, L.start.o)];
       expect(Number.isFinite(d)).toBe(true);

@@ -7,9 +7,9 @@ import { LEVELS } from '../src/levels.js';
 const load = (s) => JSON.parse(fs.readFileSync(new URL(`../public/data/${s}.json`, import.meta.url)));
 
 function routeFor(data, L) {
-  const gs = data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
-  const gx = gs.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gs.length;
-  const gz = gs.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gs.length;
+  const gs = L.goal.at ? [] : data.gates.filter((g) => g.n === L.goal.gate && g.o === L.goal.o);
+  const gx = L.goal.at ? L.goal.at.x : gs.reduce((s, g) => s + (g.a[0] + g.b[0]) / 2, 0) / gs.length;
+  const gz = L.goal.at ? L.goal.at.z : gs.reduce((s, g) => s + (g.a[1] + g.b[1]) / 2, 0) / gs.length;
   return distancesTo(data, nearestNode(data, gx, gz, L.goal.o), { underground: true });
 }
 

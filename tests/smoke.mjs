@@ -26,9 +26,12 @@ for (const [name, q] of shots) {
   await page.goto(base + '?' + q);
   await page.waitForFunction(() => window.__game && window.__game.S.state === 'play', null, { timeout: 30000 });
   await page.waitForTimeout(2500);
-  const st = await page.evaluate(() => ({ fps: window.__game.S.fps, where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }));
+  const st = await page.evaluate(() => { const g = window.__game; return { fps: g.S.fps, floor: g.nav(g.S.o).inside(g.S.x, g.S.z), where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }; });
   await page.screenshot({ path: `${out}/${name}.png` });
   console.log(name, JSON.stringify(st));
+  // a spot off the walkable area screenshots the void beside a corridor and proves nothing
+  if (!st.floor) errors.push(`${name}: spawn spot is off the walkable area`);
+  if (st.goal.includes('—')) errors.push(`${name}: no route to the goal from here`);
 }
 // the kitten, face on
 await page.goto(base + '?play&x=178.61&z=-261.56&o=-2');
@@ -168,9 +171,12 @@ for (const [name, x, z, o] of [['tokyo-33', -376.5, 949.53, -1], ['tokyo-66', -4
   await page.goto(base + `?level=1&play&fps&x=${x}&z=${z}&o=${o}`);
   await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
   await page.waitForTimeout(2000);
-  const st = await page.evaluate(() => ({ fps: window.__game.S.fps, where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }));
+  const st = await page.evaluate(() => { const g = window.__game; return { fps: g.S.fps, floor: g.nav(g.S.o).inside(g.S.x, g.S.z), where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }; });
   await page.screenshot({ path: `${out}/${name}.png` });
   console.log(name, JSON.stringify(st));
+  // a spot off the walkable area screenshots the void beside a corridor and proves nothing
+  if (!st.floor) errors.push(`${name}: spawn spot is off the walkable area`);
+  if (st.goal.includes('—')) errors.push(`${name}: no route to the goal from here`);
 }
 await page.goto(base + '?level=1&play');
 await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
@@ -180,6 +186,39 @@ await page.waitForTimeout(500);
 const td = await page.evaluate(() => ({ done: window.__game.S.done, text: document.getElementById('done-text').textContent }));
 console.log('tokyo finish', JSON.stringify(td));
 if (!td.done) errors.push('finishing the Tokyo level failed');
+
+
+// Astra's route: pick it on the title, look at the way, finish it
+await page.goto(base);
+await page.waitForFunction(() => window.__game && document.getElementById('loading').hidden);
+await page.keyboard.press('Digit2');
+await page.waitForTimeout(200);
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => window.__game.S.state === 'play' && window.__game.level.station === 'shinjuku-astra', null, { timeout: 60000 });
+await page.waitForTimeout(1500);
+const a0 = await page.evaluate(() => ({ where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }));
+await page.screenshot({ path: `${out}/astra-start.png` });
+console.log('astra via title', JSON.stringify(a0));
+if (!a0.goal.includes('西新宿')) errors.push("Astra's route did not load from the title");
+for (const [name, x, z, o] of [['astra-promenade', 249.4, -93.6, -1], ['astra-4go', -311.25, -28.91, -1], ['astra-tochomae', -660, 40, -1], ['astra-times-ave', -702.41, -139.92, -1]]) {
+  await page.goto(base + `?level=2&play&fps&x=${x}&z=${z}&o=${o}`);
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+  await page.waitForTimeout(2000);
+  const st = await page.evaluate(() => { const g = window.__game; return { fps: g.S.fps, floor: g.nav(g.S.o).inside(g.S.x, g.S.z), where: document.getElementById('where').textContent, goal: document.getElementById('goal').textContent }; });
+  await page.screenshot({ path: `${out}/${name}.png` });
+  console.log(name, JSON.stringify(st));
+  // a spot off the walkable area screenshots the void beside a corridor and proves nothing
+  if (!st.floor) errors.push(`${name}: spawn spot is off the walkable area`);
+  if (st.goal.includes('—')) errors.push(`${name}: no route to the goal from here`);
+}
+await page.goto(base + '?level=2&play');
+await page.waitForFunction(() => window.__game && window.__game.S.state === 'play');
+await page.evaluate(() => { const g = window.__game; g.S.x = g.goal.x + 2; g.S.z = g.goal.z; g.S.o = g.goal.o; });
+await page.keyboard.down('KeyW'); await page.waitForTimeout(400); await page.keyboard.up('KeyW');
+await page.waitForTimeout(500);
+const ad = await page.evaluate(() => ({ done: window.__game.S.done, text: document.getElementById('done-text').textContent }));
+console.log('astra finish', JSON.stringify(ad));
+if (!ad.done) errors.push("finishing Astra's route failed");
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();

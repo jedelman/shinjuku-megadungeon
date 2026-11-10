@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "check": "node --check src/nav.js && vite build --logLevel warn",
-    "data": "python3 tools/build_mlit.py data/raw/mlit-shinjuku-indoor-shapefile.zip public/data/shinjuku.json shinjuku && python3 tools/build_mlit.py data/raw/mlit-tokyo-indoor-shapefile.zip public/data/tokyo.json tokyo"
+    "data": "python3 tools/build_mlit.py data/raw/mlit-shinjuku-indoor-shapefile.zip public/data/shinjuku.json shinjuku && python3 tools/build_mlit.py data/raw/mlit-tokyo-indoor-shapefile.zip public/data/tokyo.json tokyo && python3 tools/build_astra.py"
   },
   "dependencies": {
     "three": "0.186.1"

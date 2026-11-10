@@ -117,12 +117,30 @@ def r2(v):
     return round(v, 2)
 
 
+def tiles(geom, size=48.0):
+    """Cut a (multi)polygon into grid tiles, valid at the 1 cm export grid."""
+    from shapely.geometry import box
+    if geom.is_empty:
+        return []
+    x0, z0, x1, z1 = geom.bounds
+    out = []
+    for i in range(int(math.floor(x0 / size)), int(math.floor(x1 / size)) + 1):
+        for j in range(int(math.floor(z0 / size)), int(math.floor(z1 / size)) + 1):
+            piece = geom.intersection(box(i * size, j * size, (i + 1) * size, (j + 1) * size))
+            for p in polys(shapely.set_precision(piece, 0.01)):
+                if p.area > 0.05:
+                    out.append(p)
+    return out
+
+
 def ring_out(ring):
     pts = list(ring.coords)[:-1]
     return [[r2(x), r2(z)] for x, z in pts]
 
 
-def main(zpath, out, station="shinjuku"):
+def main(zpath, out, station="shinjuku", extra=None, meta_extra=None):
+    """extra(per, nodes, links, exits, gates, offices), if given, adds sources before walls and connectors are
+    computed (tools/build_astra.py uses it); meta_extra is merged into the output's meta."""
     global LON0, LAT0, KX
     cfg = STATIONS[station]
     LON0, LAT0 = cfg["origin"]
@@ -213,6 +231,9 @@ def main(zpath, out, station="shinjuku"):
         links.append({"a": a, "b": b, "t": int(rec.route_type), "d": rec.distance,
                       "dir": int(rec.direction), "p": pts})
 
+    if extra:
+        extra(per, nodes, links, exits, gates, offices)
+
     floors = {}
     for o in sorted(per):
         P = per[o]
@@ -265,7 +286,8 @@ def main(zpath, out, station="shinjuku"):
             for p in polys(c.simplify(0.03)):
                 cols.append(ring_out(p.exterior))
         floors[str(o)] = {
-            "walk": [[ring_out(p.exterior)] + [ring_out(h) for h in p.interiors] for p in polys(walk)],
+            # rendered in 48 m tiles: one huge polygon with hundreds of holes can defeat the triangulator (earcut)
+            "walk": [[ring_out(p.exterior)] + [ring_out(h) for h in p.interiors] for p in tiles(walk)],
             "outdoor": [[ring_out(p.exterior)] + [ring_out(h) for h in p.interiors]
                         for p in polys(shapely.set_precision(outdoor.intersection(walk), 0.01)) if p.area > 0.5],
             "walls": walls,
@@ -280,6 +302,20 @@ def main(zpath, out, station="shinjuku"):
         adj[l["a"]].append((l["b"], i, True))
         adj[l["b"]].append((l["a"], i, False))
     isint = lambda o: abs(o - round(o)) < 1e-6
+    def add_conn(path_nodes, path_links, start, cur):
+        pts = []
+        for k, l2 in enumerate(path_links):
+            lp = links[l2]["p"] if links[l2]["a"] == path_nodes[k] else links[l2]["p"][::-1]
+            o1, o2 = nodes[path_nodes[k]][2], nodes[path_nodes[k + 1]][2]
+            for j, (px, pz) in enumerate(lp):
+                if pts and j == 0:
+                    continue
+                f = j / max(len(lp) - 1, 1)
+                pts.append([px, pz, round(o1 + (o2 - o1) * f, 3)])
+        types = {links[l2]["t"] for l2 in path_links} - {1}
+        t = 4 if 4 in types else 5 if 5 in types else 7 if 7 in types and 6 not in types else 6
+        conns.append({"t": t, "a": start, "b": cur, "p": pts})
+
     conns, seen = [], set()
     for start, (sx, sz, so) in enumerate(nodes):
         if not isint(so):
@@ -287,34 +323,32 @@ def main(zpath, out, station="shinjuku"):
         for nb, li, fwd in adj[start]:
             if links[li]["t"] not in (4, 5, 6, 7):
                 continue
-            path_nodes, path_links, cur, prev, ok = [start], [li], nb, start, True
-            while not isint(nodes[cur][2]):
-                nxt = [(n2, l2) for n2, l2, _ in adj[cur] if n2 != prev and links[l2]["t"] in (1, 4, 5, 6, 7)]
-                if len(nxt) != 1:
-                    ok = False
-                    break
-                prev, (cur, l2) = cur, nxt[0]
-                path_nodes.append(prev)
-                path_links.append(l2)
-            if not ok or nodes[cur][2] == so:
-                continue
-            key = tuple(sorted((start, cur))) + (links[li]["t"],)
-            if key in seen:
-                continue
-            seen.add(key)
-            path_nodes.append(cur)
-            pts = []
-            for k, l2 in enumerate(path_links):
-                lp = links[l2]["p"] if links[l2]["a"] == path_nodes[k] else links[l2]["p"][::-1]
-                o1, o2 = nodes[path_nodes[k]][2], nodes[path_nodes[k + 1]][2]
-                for j, (px, pz) in enumerate(lp):
-                    if pts and j == 0:
-                        continue
-                    f = j / max(len(lp) - 1, 1)
-                    pts.append([px, pz, round(o1 + (o2 - o1) * f, 3)])
-            types = {links[l2]["t"] for l2 in path_links} - {1}
-            t = 4 if 4 in types else 5 if 5 in types else 7 if 7 in types and 6 not in types else 6
-            conns.append({"t": t, "a": start, "b": cur, "p": pts})
+            # walk through half-floor landings (they can branch: Toei Tochomae's do) to each whole floor reached
+            if isint(nodes[nb][2]):
+                reach = [([start, nb], [li])]
+            else:
+                reach, frontier, seen_h = [], [([start, nb], [li])], {nb}
+                while frontier:
+                    pn, pl = frontier.pop()
+                    for n2, l2, _ in adj[pn[-1]]:
+                        if n2 in pn or links[l2]["t"] not in (1, 4, 5, 6, 7):
+                            continue
+                        if isint(nodes[n2][2]):
+                            reach.append((pn + [n2], pl + [l2]))
+                        elif n2 not in seen_h and len(pn) < 12:
+                            seen_h.add(n2)
+                            frontier.append((pn + [n2], pl + [l2]))
+            for path_nodes, path_links in reach:
+                cur = path_nodes[-1]
+                if nodes[cur][2] == so:
+                    continue
+                key = tuple(sorted((start, cur))) + (links[li]["t"],)
+                if key in seen:
+                    continue
+                seen.add(key)
+                add_conn(path_nodes, path_links, start, cur)
+
+
 
     out_obj = {
         "meta": {
@@ -323,6 +357,7 @@ def main(zpath, out, station="shinjuku"):
             "credit": "出典：国土交通省 高精度測位社会プロジェクト",
             "license": "政府標準利用規約（第2.0版）, compatible with CC BY 4.0",
             "origin": [LON0, LAT0], "units": "metres, x east, z south",
+            **(meta_extra or {}),
         },
         "floors": floors, "exits": exits, "gates": gates, "offices": offices,
         "nodes": nodes, "links": [[l["a"], l["b"], l["t"], l["d"]] for l in links], "conns": conns,
