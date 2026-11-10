@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as A from 'astronomy-engine';
-import { cast, tonight, midnightJD, longitudes, ascendant, obliquity, siderealTime, TOKYO, validDate, skySeed, describe as tell } from '../src/sky.js';
+import { cast, tonight, midnightJD, longitudes, ascendant, obliquity, siderealTime, TOKYO, validDate, skySeed, describe as tell, randomDate, sombre, SOMBRE } from '../src/sky.js';
 import { rng } from '../src/seed.js';
 
 const RAD = Math.PI / 180;
@@ -64,5 +64,16 @@ describe('the sky (checked against astronomy-engine)', () => {
     expect(skySeed(a, 'x')).toBe(skySeed(b, 'x'));
     expect(skySeed(a, 'x')).not.toBe(skySeed(a, 'y'));
     expect(tell(a)[0]).toMatch(/cast for Tokyo at midnight on \d+ \w+ \d{4}/);
+  });
+
+  it('never steps into the sombre nights: not drawn, not choosable', () => {
+    const r = rng(7);
+    for (let i = 0; i < 40000; i++) expect(sombre(randomDate(r))).toBe(false);
+    for (const d of ['1995-03-20', '1923-09-01', '1945-03-10', '1945-08-15', '2011-03-11']) {
+      expect(validDate(d)).toBe(false);
+      expect(tonight('2026-11-10', d).date).toBe(tonight('2026-11-10').date);
+    }
+    expect(validDate('1995-03-22')).toBe(true);
+    for (const [a, b] of SOMBRE) expect(a <= b).toBe(true);
   });
 });

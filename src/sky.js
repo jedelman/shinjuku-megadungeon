@@ -144,14 +144,26 @@ export function cast(date, at = TOKYO) {
   };
 }
 
-// a valid calendar date in the range the ephemeris is good for
+// Nights the game never steps into. The time warp drops you into a date's night in Tokyo's underground, so these are
+// never drawn and can't be chosen (?chart=, ?patches=): the 1995 sarin attack on these very lines (CLAUDE.md: never
+// content), the 1923 Great Kantō earthquake, the air raids on Tokyo (the first B-29 raid to the surrender), and the
+// 2011 Tōhoku earthquake. Each range is inclusive, with a day either side.
+export const SOMBRE = [
+  ['1923-08-31', '1923-09-03'],   // Great Kantō earthquake, 1 September 1923
+  ['1944-11-23', '1945-08-16'],   // the air raids on Tokyo, 24 November 1944 to the surrender, 15 August 1945
+  ['1995-03-19', '1995-03-21'],   // the sarin attack on the subway, 20 March 1995
+  ['2011-03-10', '2011-03-12'],   // the Tōhoku earthquake, 11 March 2011
+];
+export const sombre = (date) => SOMBRE.some(([a, b]) => date >= a && date <= b);
+
+// a valid calendar date in the range the ephemeris is good for, and not one of the nights above
 export function validDate(s) {
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const [y, m, d] = s.split('-').map(Number);
   if (y < 1800 || y > 2199) return false;
   const t = new Date(0);
   t.setUTCFullYear(y, m - 1, d);
-  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d && !sombre(s);
 }
 
 // Tonight's chart: a random date between 1900 and 2099, one per real day and the same for everyone; or a date you
@@ -161,14 +173,17 @@ export function tonight(day, chosen = null) {
   return cast(randomDate(rng(hash(`sky|${day}`))));
 }
 
-// a date between 1900 and 2099, from a seeded generator
+// a date between 1900 and 2099, from a seeded generator, drawn again if it's one of the nights above
 export function randomDate(r) {
   const from = Date.UTC(2000, 0, 1) - 100 * 365.2425 * 864e5;   // ~1900-01-01
   const span = 200 * 365.2425;
-  const t = new Date(Math.round(from / 864e5 + Math.floor(r() * span)) * 864e5);
-  const y = Math.max(1900, Math.min(2099, t.getUTCFullYear()));
-  const date = `${String(y).padStart(4, '0')}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
-  return validDate(date) ? date : '1927-12-30';
+  for (let tries = 0; tries < 20; tries++) {
+    const t = new Date(Math.round(from / 864e5 + Math.floor(r() * span)) * 864e5);
+    const y = Math.max(1900, Math.min(2099, t.getUTCFullYear()));
+    const date = `${String(y).padStart(4, '0')}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+    if (validDate(date)) return date;
+  }
+  return '1927-12-30';
 }
 
 // the season a date falls in, as Tokyo has it
