@@ -138,6 +138,10 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   - **The crowd.** Goofy commuters walk the walking network near the kitten, wait on platforms, and board stopped
     trains. They thin out in patches and fade between the camera and the kitten.
   - **Cost.** Use `blocks.js` (`B`, `S`, `merged`) for anything made of many little boxes: one mesh, not hundreds.
+- `src/treasure.js`: a pointless treasure in every real dead end (one link, underground, reachable, not an exit, gate or
+  stair foot), its kind drawn from tonight's chart. Walk onto it to take it. The `Store` keeps the collection
+  (`treasures`) and tonight's emptied dead ends (`found`). They do nothing, on purpose.
+- `node tests/parade.mjs` (with `vite preview` running) records the tanuki parade to webm/mp4.
 - `node tests/gaits.mjs` (with `vite preview` running) saves side-on frames of trot, gallop and sit.
 - `node tests/phone.mjs`: a Pixel 7 held sideways. The title card must fit, a tap must start the game, and a
   thumb drag must move the kitten. Run it after any UI change; it caught the dead tap (the title card covered

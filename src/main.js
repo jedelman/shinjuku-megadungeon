@@ -10,6 +10,7 @@ import { Quilt, parseAddress } from './patches.js';
 import { Critters, SPECIES } from './critters.js';
 import { Trains } from './trains.js';
 import { Crowd } from './crowd.js';
+import { Treasure, TREASURES } from './treasure.js';
 import { tonight, describe, longDate, skySeed } from './sky.js';
 
 const params = new URLSearchParams(location.search);
@@ -91,7 +92,7 @@ scene.add(beacon);
 const input = new Input(canvas);
 const store = new Store((() => { try { return localStorage; } catch { return null; } })());
 const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
-let people = null, quilt = null, critters = null, trains = null, crowd = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
+let people = null, quilt = null, critters = null, trains = null, crowd = null, treasure = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
   ride: null, outside: false, surfaced: 0, walked: 0, t0: null, t: 0, done: false, fps: 0, speed: 0,
@@ -122,6 +123,9 @@ function spawn() {
   trains = new Trains(scene, rail, level, sky, store);
   crowd?.dispose();
   crowd = new Crowd(scene, data, rail, nav, trains, skySeed(sky, `${level.id}|crowd`));
+  // a pointless treasure at the end of every dead end
+  treasure?.dispose();
+  treasure = new Treasure(scene, data, level, route, sky, store);
   visited = store.visited(level.region || level.station);
   placeList = places(data);
   applyRewards();
@@ -316,6 +320,7 @@ function finish() {
     (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '') +
     `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.` +
     `<br>Field notes: ${(store.data.notes || []).length} of ${Object.keys(SPECIES).length + 1} creatures.` +
+    (treasure?.tonight ? `<br>Pointless treasures found tonight: ${treasure.tonight}. Your collection: ${Object.keys(store.data.treasures || {}).length} of ${TREASURES.length} kinds.` : '') +
     (quilt.patches.length ? `<br><a href="?level=${levelIndex}&amp;play&amp;patches=${encodeURIComponent(quilt.addresses().join(','))}">Replay tonight's patches</a>: ${quilt.addresses().map(esc).join(' · ')}` : '');
   void n;
 }
@@ -361,7 +366,7 @@ function draw(time, dt) {
   people?.update(dt, S, time);
   quilt?.update(dt, S, time);
   if (S.state === 'play' && !S.done) {
-    const met = [...(critters?.update(dt, S, time) || []), ...(trains?.update(dt, S, time) || [])];
+    const met = [...(critters?.update(dt, S, time) || []), ...(trains?.update(dt, S, time) || []), ...(treasure?.update(dt, S, time) || [])];
     if (met.length) say(met);
     crowd?.update(dt, S, time, !!quilt?.zone);   // inside a patch it's another night, at midnight: nearly empty
   }
@@ -509,4 +514,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get crowd() { return crowd; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get treasure() { return treasure; }, get crowd() { return crowd; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };

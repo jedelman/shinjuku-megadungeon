@@ -298,13 +298,25 @@ export class People {
 export class Store {
   constructor(storage) {
     this.s = storage;
-    this.data = { rewards: [], returned: 0, helped: 0, stamps: 0, notes: [] };
+    this.data = { rewards: [], returned: 0, helped: 0, stamps: 0, notes: [], treasures: {}, found: [] };
     try { Object.assign(this.data, JSON.parse(storage?.getItem('md.progress') || '{}')); } catch { /* fresh */ }
   }
   save() { try { this.s?.setItem('md.progress', JSON.stringify(this.data)); } catch { /* private mode */ } }
   has(id) { return this.data.rewards.includes(id); }
   bump(k) { this.data[k] = (this.data[k] || 0) + 1; this.save(); }
   stamp() { this.data.stamps++; this.save(); }
+  // pointless treasure: how many of each kind, and which dead ends you've emptied (by night, so a restart doesn't refill
+  // them); returns how many kinds you have
+  treasure(kind, key) {
+    if (!this.data.treasures || typeof this.data.treasures !== 'object') this.data.treasures = {};
+    if (!Array.isArray(this.data.found)) this.data.found = [];
+    this.data.treasures[kind] = (this.data.treasures[kind] || 0) + 1;
+    if (key && !this.data.found.includes(key)) this.data.found.push(key);
+    if (this.data.found.length > 2000) this.data.found = this.data.found.slice(-2000);
+    this.save();
+    return Object.keys(this.data.treasures).length;
+  }
+  found(key) { return Array.isArray(this.data.found) && this.data.found.includes(key); }
   // field notes: the creatures you've met; true the first time
   note(id) {
     if (!Array.isArray(this.data.notes)) this.data.notes = [];
