@@ -69,11 +69,13 @@ describe('the sky (checked against astronomy-engine)', () => {
   it('never steps into the sombre nights: not drawn, not choosable', () => {
     const r = rng(7);
     for (let i = 0; i < 40000; i++) expect(sombre(randomDate(r))).toBe(false);
-    for (const d of ['1995-03-20', '1923-09-01', '1945-03-10', '1945-08-15', '2011-03-11']) {
+    for (const d of ['1995-03-20', '1923-09-01', '1931-09-18', '1937-07-07', '1940-07-10', '1945-03-10', '1945-08-15', '1945-09-02', '2011-03-11']) {
       expect(validDate(d)).toBe(false);
       expect(tonight('2026-11-10', d).date).toBe(tonight('2026-11-10').date);
     }
     expect(validDate('1995-03-22')).toBe(true);
+    expect(validDate('1931-09-15')).toBe(true);
+    expect(validDate('1945-09-05')).toBe(true);
     for (const [a, b] of SOMBRE) expect(a <= b).toBe(true);
   });
 });
