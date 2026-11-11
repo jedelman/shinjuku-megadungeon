@@ -160,6 +160,13 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   - **Undertale lends the shape only** (turns, a dodge arena, no death): never its names (FIGHT/ACT/MERCY), its heart,
     its art or its interface. The test checks the fight's lines for its words.
 - `node tests/meet.mjs` (with `vite preview` running) records a meeting with a yokai, with sound.
+- `node tests/trailer.mjs [base] [out] [shot,shot]` (with `vite preview` running) films the trailer: one-second clips
+  cut together, ending on the start screen over the snowy night, over a take of the game's own ambient score.
+  - **Virtual clock.** The game runs on one (`?vclock` swaps `performance.now` and `requestAnimationFrame`), and each
+    frame is stepped 1/30 s and screenshotted, so clips are smooth whatever the machine.
+  - **Places.** Shots find their places from the game's data (yokai spots with a clear camera, the platform doors,
+    patch vistas).
+  - **Retakes.** Name shots (or `title`) to retake just those and recut. ffmpeg needed.
 - `node tests/parade.mjs` (with `vite preview` running) records the tanuki parade to webm/mp4.
 - `node tests/listen.mjs` (with `vite preview` running) records a minute on a platform *with sound* (the page records
   its own mix; ffmpeg muxes it with Playwright's silent video). Check a mix's loudness with ffmpeg's `volumedetect`.
