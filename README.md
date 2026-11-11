@@ -57,14 +57,20 @@ that rumble past with a real Doppler shift and chime their doors open and closed
 Everything is synthesised in the browser. The station is busy, which is why the fog pockets are unsettling: the fog
 closes in, the music falls away, and the people are simply gone.
 
+In each fog pocket a yokai waits: an old umbrella on one leg, a paper lantern with its tongue out, or someone with no
+face. Meet one and you take turns: **Dodge**, **Pounce** or **Sass**, then dodge what it throws at you, as a paw in a
+little arena. Say the right cheeky thing three times and it laughs; catch its tassel three times and it falls over
+giggling; dodge it cleanly twice and it tires itself out. Nobody gets hurt. Lose your nerve and you bolt, and can come
+back. Win and the fog lifts, and the field note has real folklore, with sources.
+
 Every dead end has a consolation prize: a pointless treasure (a marble, a one-yen coin, an empty soy-sauce fish, a key to
 nothing). They do nothing. You'll want them all.
 
 ## Play
 
-- **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart, M for sound.
+- **Keyboard:** WASD or arrows to walk, Shift for zoomies, drag or Q / C to look, E for stairs, escalators and lifts, R to restart, M for sound. Meeting a yokai: 1 2 3 (or arrows and E) to choose, arrows to dodge.
 - **Gamepad:** left stick to walk, right stick to look, Ⓐ to take stairs, Ⓑ / RT for zoomies, Start to restart.
-- **Phone:** play in landscape. Left thumb walks, right thumb looks, and a ▲▼ button appears at stairs. ♪ turns sound off and on.
+- **Phone:** play in landscape. Left thumb walks, right thumb looks, and a ▲▼ button appears at stairs. ♪ turns sound off and on. Meeting a yokai: tap a choice, drag on the arena to dodge.
 
 Live: https://shinjuku-megadungeon.jason-edelman.org
 

@@ -72,7 +72,7 @@ export function pockets(data, level, route, day, patches = []) {
 export function fogAt(list, x, z, o) {
   let h = 0;
   for (const p of list) {
-    if (p.o !== o) continue;
+    if (p.o !== o || p.cleared) continue;
     const d = Math.hypot(p.x - x, p.z - z);
     const f = d <= CORE ? 1 : d >= CORE + EDGE ? 0 : 1 - (d - CORE) / EDGE;
     if (f > h) h = f;
@@ -82,5 +82,5 @@ export function fogAt(list, x, z, o) {
 
 // which pocket you're in, if any (for the line you notice once, and later for what's waiting in it)
 export function pocketAt(list, x, z, o) {
-  return list.find((p) => p.o === o && Math.hypot(p.x - x, p.z - z) < CORE) || null;
+  return list.find((p) => p.o === o && !p.cleared && Math.hypot(p.x - x, p.z - z) < CORE) || null;
 }

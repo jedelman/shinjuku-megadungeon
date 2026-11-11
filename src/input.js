@@ -19,6 +19,7 @@ export class Input {
       if (!this.keys.has(e.code)) {
         if (['KeyE', 'Enter', 'Space'].includes(e.code)) this._act = true;
         if (e.code === 'KeyR') this.restart = true;
+        if (/^Digit[1-9]$/.test(e.code)) this._digit = Number(e.code.slice(5));   // a choice, by number
       }
       this.keys.add(e.code);
       this.any = true; this.mode = 'keys';
@@ -105,6 +106,7 @@ export class Input {
     const m = Math.hypot(mx, my);
     this.move = m > 1 ? [mx / m, my / m] : [mx, my];
     this.act = this._act; this._act = false;
+    this.digit = this._digit || 0; this._digit = 0;
   }
 
   endFrame() {

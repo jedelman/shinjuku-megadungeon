@@ -26,7 +26,7 @@
     <p class="start">press any key · tap a level · Ⓐ <span class="dim">(← → to choose)</span></p>
     <p class="controls keys">
       <span class="k">WASD / stick</span> walk · <span class="k">Shift / Ⓑ</span> zoomies · <span class="k">drag / right stick / Q C</span> look ·
-      <span class="k">E / Ⓐ</span> stairs, escalators, lifts · <span class="k">R / Start</span> restart · <span class="k">M</span> sound
+      <span class="k">E / Ⓐ</span> stairs, escalators, lifts · <span class="k">R / Start</span> restart · <span class="k">M</span> sound · <span class="k">1 2 3</span> dodge, pounce, sass
     </p>
     <p class="controls touch">
       <span class="k">left thumb</span> walk (push to the edge for zoomies) · <span class="k">right thumb</span> look ·
@@ -53,6 +53,13 @@
     <button id="fs" hidden aria-label="Full screen">⛶</button>
     <button id="snd" aria-label="Sound on or off">♪</button>
     <div id="fps"></div>
+  </section>
+
+  <section id="meet" hidden>
+    <div id="meet-top"><b id="meet-name"></b><span id="meet-stat"></span></div>
+    <div id="meet-text"></div>
+    <canvas id="arena" width="240" height="134"></canvas>
+    <div id="meet-menu"></div>
   </section>
 
   <section id="done" hidden>

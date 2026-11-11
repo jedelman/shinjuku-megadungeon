@@ -127,7 +127,7 @@ export class Sound {
     const t = this.ctx.currentTime, h = this.mood.hush;
     if (t - (this.moodAt ?? -1) < 0.2) return;    // a few times a second is plenty
     this.moodAt = t;
-    this.music.gain.setTargetAtTime(0.32 * (1 - 0.9 * h) * (this.mood.encounter ? 0.35 : 1), t, 0.8);
+    this.music.gain.setTargetAtTime(this.mood.encounter ? 0.3 : 0.32 * (1 - 0.9 * h), t, 0.8);
     this.drone.gain.setTargetAtTime(DRONE * (1 + 1.2 * h), t, 1.2);
     this.wind.gain.setTargetAtTime(0.09 * h, t, 1);
     this.murmur.gain.setTargetAtTime(0.05 * Math.min(1, this.mood.crowd / 28) * (1 - h), t, 0.6);
@@ -140,7 +140,8 @@ export class Sound {
     while (this.next < ctx.currentTime + 0.15) {
       const t = this.next, step = this.step++;
       this.next += beat;
-      if (this.mood.hush > 0.6 || this.mood.encounter) continue;    // the fog swallows the tune
+      if (this.mood.encounter) { this.fightTune(t, step, beat); continue; }
+      if (this.mood.hush > 0.6) continue;    // the fog swallows the tune
       const chord = CHORDS[Math.floor(step / 32) % CHORDS.length];
       const note = (deg, oct) => this.root * 2 ** ((chord + SCALE[deg % 5] + 12 * (oct + Math.floor(deg / 5))) / 12);
       const patch = this.mood.patch;
@@ -149,6 +150,29 @@ export class Sound {
       if (Math.random() < (patch ? 0.32 : 0.11)) this.bell(t + (Math.random() < 0.5 ? 0 : beat / 2), note(Math.floor(Math.random() * 6), 2), 0.08, Math.random() * 1.4 - 0.7);
       if (step % 16 === 0 && Math.random() < 0.5) for (let i = 0; i < 3; i++) this.pluck(t + i * 0.18, note(i * 2, 1), 0.12, -0.3 + i * 0.3);
     }
+  }
+
+  // a meeting with a yokai has its own little tune: a bouncing pentatonic bass, a bell now and then
+  fightTune(t, step, beat) {
+    const walk = [0, 7, 9, 7, 4, 7, 2, 7];
+    for (const half of [0, 1]) {
+      const n = step * 2 + half;
+      this.pluck(t + half * beat / 2, this.root * 2 ** ((walk[n % 8] + (Math.floor(n / 16) % 2 ? 5 : 0)) / 12), 0.12, (half - 0.5) * 0.4);
+      if (n % 8 === 4) this.bell(t + half * beat / 2, this.root * 4 * 2 ** (SCALE[(n >> 3) % 5] / 12), 0.05, 0.3);
+    }
+  }
+
+  // short sounds for the yokai and the arena
+  sting(kind) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, f = this.root, o = this.sfx;
+    if (kind === 'meet') { this.bell(t, f * 2, 0.14, -0.2, o); this.bell(t + 0.4, f * 2 * Math.SQRT2, 0.12, 0.2, o); }   // a tritone: something's off
+    else if (kind === 'select') this.tick(2400, 0.05, 0);
+    else if (kind === 'hit') { this.thump(140, 0.4, 0, 0.14); this.tick(700, 0.08, 0); }
+    else if (kind === 'caught') [1, 1.5, 2].forEach((m, i) => this.pluck(t + i * 0.06, f * 2 * m, 0.16, 0, o));
+    else if (kind === 'clean') [1, 1.25].forEach((m, i) => this.bell(t + i * 0.15, f * 4 * m, 0.08, 0, o));
+    else if (kind === 'won') [1, 1.25, 1.5, 2].forEach((m, i) => this.bell(t + i * 0.16, f * 2 * m, 0.11, (i - 1.5) * 0.3, o));
+    else if (kind === 'fled') [1.5, 1.25, 1, 0.75].forEach((m, i) => this.pluck(t + i * 0.07, f * 2 * m, 0.14, 0, o));
   }
 
   pan(p) { const n = this.ctx.createStereoPanner(); n.pan.value = Math.max(-1, Math.min(1, p)); return n; }
@@ -164,8 +188,8 @@ export class Sound {
   }
 
   // a plucked string: a bright triangle that darkens as it dies away
-  pluck(t, f, v, p = 0) {
-    const ctx = this.ctx, pn = this.pan(p); pn.connect(this.music);
+  pluck(t, f, v, p = 0, out = this.music) {
+    const ctx = this.ctx, pn = this.pan(p); pn.connect(out);
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2;
     lp.frequency.setValueAtTime(3800, t); lp.frequency.exponentialRampToValueAtTime(500, t + 0.7);
     const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);

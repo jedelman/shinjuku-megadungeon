@@ -462,15 +462,110 @@ for (const [name, r] of [['quilt-snow', heartOf('three-chalk-cats')], ['quilt-sa
   const f = await page.evaluate(() => window.__game.fog.find((p) => p.way));
   if (!f) errors.push('no fog pocket on the way');
   else {
-    await page.goto(base + `?level=0&play&day=2026-11-10&x=${f.x}&z=${f.z}&o=${f.o}`);
+    // a step inside the pocket, where you notice the fog before its yokai comes to meet you
+    const sp = await page.evaluate((f) => {
+      const nav = window.__game.nav(f.o);
+      for (let r = 5; r <= 7; r += 0.5) for (let a = 0; a < 32; a++) {
+        const x = f.x + Math.cos(a / 32 * Math.PI * 2) * r, z = f.z + Math.sin(a / 32 * Math.PI * 2) * r;
+        if (nav.inside(x, z)) return { x, z };
+      }
+      return { x: f.x, z: f.z };
+    }, f);
+    await page.goto(base + `?level=0&play&day=2026-11-10&x=${sp.x}&z=${sp.z}&o=${f.o}`);
     await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.crowd);
     await page.mouse.click(640, 360);
-    await page.waitForTimeout(3500);
+    await page.waitForTimeout(1200);
     const st = await page.evaluate(() => ({ mist: window.__game.mist, crowd: window.__game.crowd.active.length, said: document.getElementById('say').textContent, range: window.__game.shared.uFogRange.value.y }));
     console.log('fog pocket', JSON.stringify(st));
-    if (st.mist < 0.99 || st.crowd > 0 || st.range > 8) errors.push(`the fog pocket isn't foggy and empty (${JSON.stringify(st)})`);
+    if (st.mist < 0.95 || st.crowd > 0 || st.range > 8) errors.push(`the fog pocket isn't foggy and empty (${JSON.stringify(st)})`);
     if (st.said !== f.line) errors.push(`no line on walking into the fog (${st.said})`);
     await page.screenshot({ path: `${out}/fog-pocket.png` });
+  }
+}
+
+// Yokai: walk up to each, then befriend the first through the real keys and buttons, and lose your nerve to the second
+{
+  await page.goto(base + '?level=0&play&day=2026-11-10');
+  await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.encounters);
+  const spots = await page.evaluate(() => {
+    const g = window.__game;
+    return g.encounters.list.map((y) => {
+      const nav = g.nav(y.o);
+      for (let r = 6; r >= 4; r -= 0.5) for (let a = 0; a < 32; a++) {
+        const x = y.x + Math.cos(a / 32 * Math.PI * 2) * r, z = y.z + Math.sin(a / 32 * Math.PI * 2) * r;
+        if (nav.inside(x, z) && nav.ray(y.x, y.z, (x - y.x) / r, (z - y.z) / r, r) >= r - 0.1) return { kind: y.kind, x, z, o: y.o, yx: y.x, yz: y.z };
+      }
+      return null;
+    }).filter(Boolean);
+  });
+  if (spots.length < 2) errors.push(`only ${spots.length} yokai can be walked up to`);
+  const meet = async (p) => {
+    await page.goto(base + `?level=0&play&day=2026-11-10&x=${p.x}&z=${p.z}&o=${p.o}&yaw=${Math.atan2(-(p.yx - p.x), -(p.yz - p.z))}`);
+    await page.waitForFunction(() => window.__game && window.__game.S.state === 'play' && window.__game.encounters);
+    await page.evaluate(() => { const g = window.__game; g.store.data.notes = (g.store.data.notes || []).filter((n) => !n.startsWith('yokai:')); g.store.data.found = []; });
+    await page.mouse.click(640, 200);
+    await page.keyboard.down('KeyW');
+    const met = await page.waitForFunction(() => window.__game.encounters.active, null, { timeout: 10000 }).then(() => true, () => false);
+    await page.keyboard.up('KeyW');
+    if (!met) errors.push(`walked up to the ${p.kind} and nothing happened`);
+    return met;
+  };
+  // befriend: E past the intro, 3 for Sass, click the line it likes, E, dodge a turn; three times
+  const a = spots[0];
+  if (await meet(a)) {
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${out}/yokai-${a.kind}.png` });
+    const phase = (want, timeout = 9000) => page.waitForFunction((w) => window.__game.encounters.fight?.phase === w, want, { timeout });
+    await page.keyboard.press('KeyE');
+    await phase('menu');
+    for (let n = 0; n < 6; n++) {
+      await page.keyboard.press('Digit3');
+      await phase('sass', 3000);
+      const good = await page.evaluate(() => window.__game.encounters.fight.lines.findIndex((l) => l.good));
+      await page.click(`#meet-menu button[data-i="${good}"]`);
+      await page.waitForFunction(() => window.__game.encounters.fight?.phase !== 'sass', null, { timeout: 3000 });
+      if (await page.evaluate(() => window.__game.encounters.fight?.phase === 'won')) break;
+      await page.evaluate(() => { window.__game.encounters.fight.nerve = 99; });   // the test is about the words, not the dodging
+      await page.keyboard.press('KeyE');
+      await phase('turn', 4000);
+      if (n === 0) { await page.waitForTimeout(2500); await page.screenshot({ path: `${out}/yokai-${a.kind}-arena.png` }); }
+      await page.waitForFunction(() => window.__game.encounters.fight?.phase !== 'turn', null, { timeout: 9000 });
+      await page.keyboard.press('KeyE');
+      await phase('menu', 4000);
+    }
+    const won = await page.evaluate(() => ({ phase: window.__game.encounters.fight?.phase, outcome: window.__game.encounters.fight?.outcome }));
+    await page.waitForTimeout(800);   // a moment to read it
+    await page.screenshot({ path: `${out}/yokai-${a.kind}-won.png` });
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(2500);
+    const after = await page.evaluate(() => ({ active: window.__game.encounters.active, mist: window.__game.mist, notes: window.__game.store.data.notes, said: document.getElementById('say').textContent }));
+    console.log('yokai', a.kind, JSON.stringify(won), JSON.stringify({ ...after, said: after.said.slice(0, 90) }));
+    if (won.outcome !== 'befriended') errors.push(`sassing the ${a.kind} didn't befriend it (${JSON.stringify(won)})`);
+    if (after.active || after.mist > 0.05 || !after.notes.includes(`yokai:${a.kind}`)) errors.push(`after the ${a.kind}: the fight didn't close, the fog didn't lift, or no field note (${JSON.stringify(after)})`);
+  }
+  // lose your nerve: put the paw in the way of a bullet with one nerve left
+  const b = spots[1];
+  if (b && await meet(b)) {
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction(() => window.__game.encounters.fight?.phase === 'menu', null, { timeout: 8000 }).catch(() => {});
+    await page.keyboard.press('Digit1');
+    await page.waitForFunction(() => {
+      const f = window.__game.encounters.fight;
+      if (!f) return false;
+      if (f.phase === 'fled') return true;
+      if (f.phase !== 'turn') return false;
+      f.nerve = 1;
+      const bl = f.bullets().find((q) => !q.warn);
+      if (bl) f.paw = { x: bl.x, y: bl.y };
+      return false;
+    }, null, { timeout: 9000, polling: 50 }).catch(() => {});
+    const fled = await page.evaluate(() => window.__game.encounters.fight?.outcome);
+    await page.waitForTimeout(800);
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(800);
+    const st = await page.evaluate((p) => { const g = window.__game; return { active: g.encounters.active, d: Math.hypot(g.S.x - p.yx, g.S.z - p.yz), said: document.getElementById('say').textContent }; }, b);
+    console.log('yokai', b.kind, fled, JSON.stringify(st));
+    if (fled !== 'fled' || st.active || st.d < 3) errors.push(`losing your nerve to the ${b.kind} didn't send you bolting (${fled}, ${JSON.stringify(st)})`);
   }
 }
 
