@@ -411,6 +411,66 @@ means something. Headless fps holds around 33–60.
 - `node tests/listen.mjs` records a minute on the Marunouchi platform with sound. Playwright's video has no audio, so
   the page records its own mix and ffmpeg muxes the two.
 
+## Yokai, and Dodge / Pounce / Sass (2026-11-10)
+
+The second wave of Jason's ask: "some kind of yokai. We should also add some kind of cute combat a la Undertale -
+dodge, pounce, and sass are your main actions."
+
+**Who** (`src/yokai.js`). One yokai waits in each fog pocket, its kind drawn from tonight's chart. Each kind appears
+once before any repeats. All three are public-domain folklore; the looks are blocky and the game's own, not GeGeGe no
+Kitarō's, Yo-kai Watch's or any illustrator's design.
+- **Kasa-obake** (唐傘お化け): an old oiled-paper umbrella come alive. One eye, a tongue, one leg in a geta, hopping.
+- **Chōchin-obake** (提灯お化け): an old paper lantern split into a grin, tongue out. It glows through the fog like a lit
+  sign.
+- **Noppera-bō** (のっぺらぼう): someone in a coat with their back to you, who turns round and has no face. It's after
+  Lafcadio Hearn's "Mujina" (Kwaidan, 1904), which is set on Kii-no-kuni-zaka in Akasaka. Win and the coat drops away:
+  a mujina, an animal in disguise. Hearn blames a mujina but never says outright that it wears the faces; the
+  disguise reading is yokai.com's ("a favorite transformation of mischievous animal yōkai").
+
+**Field notes.** Every fact carries a source, checked 2026-11-10:
+- Kyoto University Library's tsukumogami scroll (tools get souls after 100 years; the midnight march down Ichijō-dōri).
+- Hearn's text on Project Gutenberg. I checked "Kii-no-kuni-zaka", "like unto an Egg" and the 1904 preface myself.
+- Minato City (the slope runs from Akasaka-mitsuke toward Yotsuya, and Akasaka's name is said to come from it).
+- yokai.com and yokai.jp for the looks. yokai.jp is a company site, not an authority, so only its sourced descriptions
+  are used.
+- Left out: the akaname (a sign of filth, not a cute bathroom cleaner), and any "yokai of lost property" (none exists
+  in the tradition, as far as the search found).
+
+**Meeting one.**
+- Inside a pocket, a yokai that can see you (never through a wall: `FloorNav.ray`) comes to meet you. The noppera-bō
+  waits with its back turned.
+- At 2.6 m the fight takes the controls. The camera goes behind the kitten and looks up at the yokai, above the arena
+  panel.
+- The music becomes a bouncing pentatonic bass with a bell now and then; a tritone sting marks the meeting.
+
+**The fight** (`src/fight.js`, pure: a fight is a function of its yokai, its seed and what you do):
+- **Turns.** Choose Dodge, Pounce or Sass (1 2 3, arrows and E, a stick and Ⓐ, or tap). Then the yokai takes 6 s and
+  you dodge in a small arena, as a paw (keys, stick, or drag on the arena).
+- **No death.** Hits cost nerve (5). With none left the kitten bolts back out of the fog, to where she came in. The
+  yokai stays, and she can try again with her nerve back.
+- **Sass.** Three lines: one it likes, two it doesn't. The right one three times and it laughs: befriended. A liked line
+  makes the next turn gentler; a bad one makes it harsher.
+- **Pounce.** Its tassel (or tongue, or sleeve) wanders the arena. Touch it during the turn; three catches and it's
+  bowled over, giggling.
+- **Dodge.** The paw is faster. A turn with no hits counts; two and it tires itself out.
+- **Patterns,** three per kind:
+  - umbrella: drizzle with a drifting dry spot, the umbrella bounding across the floor, a spinning spray;
+  - lantern: rising embers with a cool column, a tongue lashing one lane at a time after a flicker, rings with a gap;
+  - noppera-bō: rolling eggs, a sleeve sweeping with one gap, blank faces that surface and pop.
+- **Winning,** any way, lifts that pocket's fog for the night (the crowd comes back), keeps a record (`Store.yokai`:
+  how you met each kind), and writes the field note. The finish card counts yokai separately from creatures.
+
+**Undertale lends the shape, nothing else.** Turns, a dodge arena, nobody has to get hurt. None of its names (no FIGHT /
+ACT / MERCY), no heart (the marker is a paw), none of its art, and not its black-and-white box (the panel is the game's
+own sign style). `tests/yokai.test.js` checks the fight's lines for its words.
+
+**Tests:**
+- `tests/fight.test.js` proves every pattern fair: a careful bot that looks 0.14 s ahead takes at most 0.5 hits a turn
+  on average, and standing still gets hit. It also wins every kind all three ways and loses its nerve standing still.
+- `tests/yokai.test.js`: sources, placement, the Store.
+- The smoke test befriends a yokai through the real keys and buttons, then loses its nerve to another.
+- `node tests/meet.mjs` records a meeting with sound.
+
 ## Open data around Shinjuku: the inventory (checked 2026-11-10)
 
 | source | id | licence | what it adds | in repo? |
@@ -463,7 +523,7 @@ Keio and Tokyo Metro are missing too. These come from OpenStreetMap (ODbL), whic
 - **3f. Done 2026-11-10:** trains on OSM platforms (sometimes tanuki), platform doors, and a crowd.
 - **3g. Done 2026-11-10:** pointless treasure in every dead end.
 - **3h. Done 2026-11-10:** sound (generative music, train rumble with Doppler, door chimes), a busier crowd, fog pockets.
-- **3i.** Yokai in the fog, and Dodge / Pounce / Sass encounters.
+- **3i. Done 2026-11-10:** yokai in the fog, and Dodge / Pounce / Sass encounters.
 - **4.** The network: lines, trains, more stations from OSM.
 - **Sound**, still to do: an original departure melody per station, rooms with their own hum.
 

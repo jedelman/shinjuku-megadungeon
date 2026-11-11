@@ -53,7 +53,7 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
 - **No operator logos or marks** (Tokyo Metro, Toei, JR, Odakyu, Keio, Seibu). Real exit codes, station
   names and gate names are facts and fine. Wayfinding colours can echo reality without copying marks.
 - **Don't recreate other games.** MegaMan Legends lends a shape (a town above, ruins below, PS1 3D,
-  a chase camera), never its characters, art or names. The Exit 8 owns "looping corridor, spot the
+  a chase camera), never its characters, art or names. Undertale lends the encounters' shape the same way. The Exit 8 owns "looping corridor, spot the
   anomaly". This game is a real corridor that doesn't loop; it only feels like it does.
 - The 1995 sarin attack is never content. Because the time warp drops you into a date's night in this underground,
   `SOMBRE` in `src/sky.js` lists nights that are never drawn or choosable: the sarin attack, the 1923 earthquake, the
@@ -149,7 +149,17 @@ Shinjuku Station, x east, z south, o = floor), `?fps` shows fps, `?nosnap` turns
   - **Starting.** Sound starts on the first tap or key (browser rule); M / ♪ mutes it, remembered in `md.sound`.
 - `src/fog.js`: fog pockets, 2–3 a night from the chart, at least one on the way to the goal, clear of patches. Inside
   one, the fog closes in (`MIST` in `main.js`), the crowd is gone (`Crowd.update(..., empty)`), and the music hushes.
-  Wave 2 puts yokai here.
+  A yokai waits in each.
+- `src/fight.js` + `src/yokai.js`: yokai and the Dodge / Pounce / Sass fights.
+  - **The fight** (`fight.js`) is pure: `Fight(kind, seed)`, with `choose`, `sass`, `skip` and `step(dt, move)`.
+    Patterns are pure functions of time. `tests/fight.test.js` makes a careful bot pass every pattern; keep new
+    patterns fair.
+  - **The yokai** (`yokai.js`): one per fog pocket (`haunt()`), models, line of sight (never through a wall), the arena
+    panel (`#meet` in `index.html`), and winning, which lifts the fog (`pocket.cleared`, kept per night in `found`).
+    **Every field-note fact has a source URL in `YOKAI`** (`tests/yokai.test.js`).
+  - **Undertale lends the shape only** (turns, a dodge arena, no death): never its names (FIGHT/ACT/MERCY), its heart,
+    its art or its interface. The test checks the fight's lines for its words.
+- `node tests/meet.mjs` (with `vite preview` running) records a meeting with a yokai, with sound.
 - `node tests/parade.mjs` (with `vite preview` running) records the tanuki parade to webm/mp4.
 - `node tests/listen.mjs` (with `vite preview` running) records a minute on a platform *with sound* (the page records
   its own mix; ffmpeg muxes it with Playwright's silent video). Check a mix's loudness with ffmpeg's `volumedetect`.

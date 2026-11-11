@@ -14,6 +14,7 @@ import { Treasure, TREASURES } from './treasure.js';
 import { tonight, describe, longDate, skySeed } from './sky.js';
 import { Sound } from './audio.js';
 import { pockets, fogAt, pocketAt } from './fog.js';
+import { Encounters, YOKAI } from './yokai.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -97,7 +98,7 @@ const input = new Input(canvas);
 const store = new Store((() => { try { return localStorage; } catch { return null; } })());
 const today = new Date().toISOString().slice(0, 10);   // lost things and lost people change daily
 const sound = new Sound((() => { try { return localStorage.getItem('md.sound') === 'off'; } catch { return false; } })());
-let fog = [], fogSeen = new Set(), mist = 0;
+let fog = [], fogSeen = new Set(), mist = 0, encounters = null;
 let people = null, quilt = null, critters = null, trains = null, crowd = null, treasure = null, sky = null, visited = null, placeList = [], lastPlaceCheck = 0, sayUntil = 0;
 const S = {
   state: 'title', x: 0, z: 0, o: -2, yaw: 0, pitch: 0.3, head: 0, phase: 0,
@@ -135,6 +136,9 @@ function spawn() {
   // fog pockets, where the crowd is gone; and tonight's key for the music
   fog = pockets(data, level, route, sky, quilt.patches);
   fogSeen = new Set();
+  // a yokai waits in each fog pocket
+  encounters?.dispose();
+  encounters = new Encounters(scene, fog, sky, level, store, sound, nav);
   sound.key(sky);
   visited = store.visited(level.region || level.station);
   placeList = places(data);
@@ -243,6 +247,14 @@ function frame(now) {
 
 function update(dt) {
   if (S.done) { if (input.act) spawn(); return; }
+  // meeting a yokai: the fight takes the controls until it's over
+  if (encounters && !S.ride) {
+    const was = encounters.active;
+    const r = encounters.update(dt, S, input);
+    if (r.lines.length) say(r.lines);
+    if (r.flee) { S.x = r.flee.x; S.z = r.flee.z; S.yaw += Math.PI; S.head = S.yaw + Math.PI; }
+    if (was || encounters.active) { S.speed += (0 - S.speed) * Math.min(1, dt * 12); return; }
+  }
   if (S.ride) {
     const r = S.ride;
     r.t += dt;
@@ -331,7 +343,9 @@ function finish() {
     (people.helped ? `<br>You helped ${people.helped} ${people.helped > 1 ? 'people' : 'person'} find their way.` : '') +
     (quilt.walked.length ? `<br>You walked the whole of ${quilt.walked.map(esc).join(', ')}.` : '') +
     `<br>Tonight's sky was cast for ${esc(longDate(sky.date))}.` +
-    `<br>Field notes: ${(store.data.notes || []).length} of ${Object.keys(SPECIES).length + 1} creatures.` +
+    `<br>Field notes: ${(store.data.notes || []).filter((n) => !n.startsWith('yokai:')).length} of ${Object.keys(SPECIES).length + 1} creatures, ` +
+    `${(store.data.notes || []).filter((n) => n.startsWith('yokai:')).length} of ${Object.keys(YOKAI).length} yokai.` +
+    (encounters?.met ? `<br>The fog lifted ${encounters.met} time${encounters.met > 1 ? 's' : ''} tonight.` : '') +
     (treasure?.tonight ? `<br>Pointless treasures found tonight: ${treasure.tonight}. Your collection: ${Object.keys(store.data.treasures || {}).length} of ${TREASURES.length} kinds.` : '') +
     (quilt.patches.length ? `<br><a href="?level=${levelIndex}&amp;play&amp;patches=${encodeURIComponent(quilt.addresses().join(','))}">Replay tonight's patches</a>: ${quilt.addresses().map(esc).join(' · ')}` : '');
   void n;
@@ -356,6 +370,13 @@ function draw(time, dt) {
   const cx = S.x + dx * dh, cz = S.z + dz * dh;
   camera.position.set(cx, cy, cz);
   camera.lookAt(target.x - dx * 0.6, target.y + 0.32, target.z - dz * 0.6);
+  if (encounters?.active) {
+    // in a fight: behind the kitten, looking up at the yokai, which sits above the arena
+    const box = $('meet').getBoundingClientRect();
+    const f = encounters.frame(S, baseY, box.height ? box.top / innerHeight : 0.55, camera.fov);
+    camera.position.set(...f.pos);
+    camera.lookAt(...f.look);
+  }
   shared.uCam.value.copy(camera.position);
   shared.uFocus.value.set(S.x, baseY + 0.16, S.z);
 
@@ -385,11 +406,12 @@ function draw(time, dt) {
     const met = [...(critters?.update(dt, S, time) || []), ...(trains?.update(dt, S, time) || []), ...(treasure?.update(dt, S, time) || [])];
     if (met.length) say(met);
     crowd?.update(dt, S, time, !!quilt?.zone, mist);   // inside a patch it's another night, at midnight: nearly empty
+    encounters?.draw(dt, S, time);
     // what you hear: the music's mood, the trains from where they are, the doors
     const L = { x: S.x, z: S.z, o: S.o, yaw: S.yaw };
-    sound.setMood({ hush: mist, patch: !!quilt?.zone, crowd: crowd?.active.length || 0 });
+    sound.setMood({ hush: mist, patch: !!quilt?.zone, crowd: crowd?.active.length || 0, encounter: !!encounters?.active });
     if (trains) { sound.trains(L, trains.heard, dt); for (const d of trains.dings) sound.ding(d.kind, L, d.x, d.z); }
-  } else sound.setMood({ hush: 0, patch: false, crowd: 0 });
+  } else sound.setMood({ hush: 0, patch: false, crowd: 0, encounter: false });
   ps1.render(scene, camera);
   hud();
 }
@@ -424,10 +446,12 @@ function drawMap() {
 
 function hud() {
   if (S.state !== 'play') return;
-  const pn = !S.ride && !S.done && (people?.nearest(S) || quilt?.nearest(S));
-  const e = !S.ride && !pn && nearestEnd();
+  const fighting = !!encounters?.active;
+  document.body.classList.toggle('fighting', fighting);
+  const pn = !S.ride && !S.done && !fighting && (people?.nearest(S) || quilt?.nearest(S));
+  const e = !S.ride && !pn && !fighting && nearestEnd();
   let prompt = '';
-  if (S.done) prompt = '';
+  if (S.done || fighting) prompt = '';
   else if (S.ride) prompt = `${KIND_NAME[S.ride.kind]} to ${floorName(S.ride.to)}…`;
   else if (pn) prompt = `◆ ${pn.prompt}`;
   else if (e) prompt = `${e.to > S.o ? '▲' : '▼'} ${KIND_NAME[e.t]} to ${floorName(e.to)}`;
@@ -543,4 +567,4 @@ $('loading').hidden = true;
 requestAnimationFrame(frame);
 
 // for tests and curious people
-window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get treasure() { return treasure; }, get crowd() { return crowd; }, sound, get fog() { return fog; }, get mist() { return mist; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };
+window.__game = { S, get people() { return people; }, get quilt() { return quilt; }, get critters() { return critters; }, get trains() { return trains; }, get treasure() { return treasure; }, get crowd() { return crowd; }, get encounters() { return encounters; }, sound, get fog() { return fog; }, get mist() { return mist; }, get rail() { return rail; }, get sky() { return sky; }, store, get visited() { return visited; }, get data() { return data; }, get goal() { return goal; }, get route() { return route; }, get level() { return level; }, start, spawn, camera, shared, nav };

@@ -68,6 +68,29 @@ canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block;
   max-width: min(36em, 86vw); padding: 0.6em 0.9em; background: rgba(8, 10, 12, 0.78); border: 1px solid #5c584d;
   border-radius: 6px; font-size: 13px; line-height: 1.6; text-align: center;
 }
+#meet {
+  position: fixed; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5;
+  width: min(420px, 92vw); padding: 0.55em 0.7em 0.6em; background: rgba(8, 10, 12, 0.8); border: 1px solid #5c584d;
+  border-radius: 8px; font-size: 13px; text-shadow: var(--shadow); touch-action: none; user-select: none;
+}
+body.fighting #say { display: none; }
+#meet-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1em; font-size: 11px; color: var(--dim); }
+#meet-top b { color: var(--sign); font-weight: 400; white-space: nowrap; }
+#meet-top span { white-space: nowrap; }
+#meet-text { min-height: 2.9em; margin: 0.35em 0; line-height: 1.45; }
+#arena {
+  position: static; inset: auto; height: auto;   /* not the game view's full-screen canvas rule */
+  display: block; margin: 0 auto; width: min(100%, calc((78vh - 140px) / 0.56)); aspect-ratio: 240 / 134;
+  image-rendering: pixelated; border: 1px solid #5c584d; border-radius: 4px;
+}
+#meet-menu { display: flex; gap: 0.5em; justify-content: center; margin-top: 0.45em; }
+#meet-menu.lines { flex-direction: column; align-items: stretch; }
+#meet-menu button {
+  font: inherit; color: var(--ink); background: rgba(0, 0, 0, 0.4); border: 1px solid #5c584d; border-radius: 999px;
+  padding: 0.4em 0.95em;
+}
+#meet-menu.lines button { border-radius: 6px; text-align: left; }
+#meet-menu button.on { border-color: var(--sign); color: var(--sign); }
 #fps { position: absolute; bottom: 6px; left: 8px; font-size: 10px; color: var(--dim); }
 #done-text { max-width: 34em; line-height: 1.8; font-size: 15px; }
 

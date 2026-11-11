@@ -317,6 +317,16 @@ export class Store {
     return Object.keys(this.data.treasures).length;
   }
   found(key) { return Array.isArray(this.data.found) && this.data.found.includes(key); }
+  // yokai: how each kind was met (befriended, bowled, tired), and tonight's cleared fog pockets (in `found`)
+  yokai(kind, how, key) {
+    if (!this.data.yokai || typeof this.data.yokai !== 'object') this.data.yokai = {};
+    const k = (this.data.yokai[kind] ||= {});
+    k[how] = (k[how] || 0) + 1;
+    if (!Array.isArray(this.data.found)) this.data.found = [];
+    if (key && !this.data.found.includes(key)) this.data.found.push(key);
+    this.save();
+    return Object.keys(this.data.yokai).length;
+  }
   // field notes: the creatures you've met; true the first time
   note(id) {
     if (!Array.isArray(this.data.notes)) this.data.notes = [];

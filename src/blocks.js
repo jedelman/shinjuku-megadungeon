@@ -5,14 +5,16 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeMaterial } from './ps1.js';
 
 const mats = new Map();
-// one shared material; `fade` turns it to screen-door when it's between the camera and the kitten, like walls
-export function blockMaterial(fade = false) {
-  if (!mats.has(fade)) {
+// one shared material; `fade` turns it to screen-door when it's between the camera and the kitten, like walls;
+// `glow` carries further through the fog, like a lit sign
+export function blockMaterial(fade = false, glow = 0) {
+  const key = `${fade}|${glow}`;
+  if (!mats.has(key)) {
     const t = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
     t.needsUpdate = true;
-    mats.set(fade, makeMaterial(t, { fade }));
+    mats.set(key, makeMaterial(t, { fade, glow }));
   }
-  return mats.get(fade);
+  return mats.get(key);
 }
 
 function coloured(geo, hex) {
@@ -27,5 +29,8 @@ function coloured(geo, hex) {
 export const B = (w, h, d, hex, x = 0, y = 0, z = 0) => coloured(new THREE.BoxGeometry(w, h, d).translate(x, y, z), hex);
 // a ball of radius r at (x, y, z), squashed by (sx, sy, sz)
 export const S = (r, hex, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) => coloured(new THREE.SphereGeometry(r, 7, 5).scale(sx, sy, sz).translate(x, y, z), hex);
+// a cone of radius r and height h, its base at (x, y, z), pointing up (or down, with h < 0)
+export const C = (r, h, hex, x = 0, y = 0, z = 0, seg = 8) =>
+  coloured(new THREE.ConeGeometry(r, Math.abs(h), seg, 1, false).rotateX(h < 0 ? Math.PI : 0).translate(x, y + h / 2, z), hex);
 // many pieces, one mesh
-export const merged = (parts, fade = false) => new THREE.Mesh(mergeGeometries(parts), blockMaterial(fade));
+export const merged = (parts, fade = false, glow = 0) => new THREE.Mesh(mergeGeometries(parts), blockMaterial(fade, glow));
